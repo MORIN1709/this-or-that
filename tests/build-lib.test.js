@@ -43,6 +43,19 @@ test('pickArtists filters Hebrew, off-genre and unscored artists, sorts by score
   assert.deepEqual(pickArtists(candidates, scores, 'thrash metal').map((a) => a.name), ['Metallica', 'Megadeth', 'Slayer']);
 });
 
+test('pickArtists prefers genre-in-top-3 artists, then fills from top 5', () => {
+  const withRank = (rank) => [...Array(rank - 1)].map((_, i) => ({ name: `x${i}`, count: 100 - i })).concat({ name: 'thrash metal', count: 100 - rank });
+  const candidates = [
+    { id: 'A', name: 'Accept', tags: withRank(4) },
+    { id: 'B', name: 'Tankard', tags: withRank(1) },
+    { id: 'C', name: 'Evile', tags: withRank(2) },
+    { id: 'D', name: 'Poison', tags: withRank(6) },
+  ];
+  const scores = new Map([['A', 900], ['B', 100], ['C', 50], ['D', 999]]);
+  assert.deepEqual(pickArtists(candidates, scores, 'thrash metal', 3).map((a) => a.id), ['B', 'C', 'A']);
+  assert.deepEqual(pickArtists(candidates, scores, 'thrash metal', 2).map((a) => a.id), ['B', 'C']);
+});
+
 // Builds a release in the shape of /ws/2/release?artist=…&inc=recordings+release-groups
 function release({ rg, rgTitle, first, secondary = [], date, tracks, format = 'CD', extraMedia = [] }) {
   return {

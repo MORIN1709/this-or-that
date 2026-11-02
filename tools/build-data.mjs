@@ -39,7 +39,7 @@ async function fetchReleases(fetcher, artistId, log) {
 }
 
 export async function buildAll({
-  fetcher, genres = GENRES, perGenre = 30, minArtists = 5, maxRank = 5,
+  fetcher, genres = GENRES, perGenre = 30, minArtists = 5,
   built = new Date().toISOString().slice(0, 10), log = () => {},
 }) {
   const albumsByArtist = new Map(); // artists shared between genres are fetched once
@@ -52,7 +52,7 @@ export async function buildAll({
     const candidates = (search && search.artists) || [];
     const rows = candidates.length ? await fetcher.postJson(LB_POPULARITY, { artist_mbids: candidates.map((a) => a.id) }) : [];
     const scores = new Map((Array.isArray(rows) ? rows : []).map((r) => [r.artist_mbid, r.total_user_count || 0]));
-    const picked = pickArtists(candidates, scores, genre, perGenre, maxRank);
+    const picked = pickArtists(candidates, scores, genre, perGenre);
     if (picked.length < minArtists) {
       log(`  skipped: only ${picked.length} artists after filtering`);
       continue;

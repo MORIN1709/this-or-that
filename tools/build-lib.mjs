@@ -27,12 +27,16 @@ export function isMainTag(tags, genre, maxRank = 5) {
     .some((t) => t.name.toLowerCase() === want);
 }
 
-export function pickArtists(candidates, scores, genre, n = 30, maxRank = 5) {
-  return candidates
-    .filter((a) => !HEBREW.test(a.name) && isMainTag(a.tags, genre, maxRank) && (scores.get(a.id) || 0) > 0)
-    .sort((a, b) => scores.get(b.id) - scores.get(a.id))
-    .slice(0, n)
-    .map((a) => ({ id: a.id, name: a.name }));
+// Most-listened artists of the genre: first those with the genre among their top `strictRank`
+// tags (tuned on real thrash data: keeps out Accept, The Exploited, Discharge), then, only if
+// that leaves fewer than n, filled up from those with it among their top `looseRank` tags.
+export function pickArtists(candidates, scores, genre, n = 30, strictRank = 3, looseRank = 5) {
+  const ranked = candidates
+    .filter((a) => !HEBREW.test(a.name) && (scores.get(a.id) || 0) > 0)
+    .sort((a, b) => scores.get(b.id) - scores.get(a.id));
+  const strict = ranked.filter((a) => isMainTag(a.tags, genre, strictRank));
+  const loose = ranked.filter((a) => !strict.includes(a) && isMainTag(a.tags, genre, looseRank));
+  return [...strict, ...loose].slice(0, n).map((a) => ({ id: a.id, name: a.name }));
 }
 
 function songsOf(release) {
