@@ -1,0 +1,23 @@
+{
+ "built": "fixture",
+ "genres": [
+  {
+   "slug": "thrash-metal",
+   "name": "thrash metal",
+   "counts": {
+    "artists": 6,
+    "albums": 10,
+    "songs": 21
+   }
+  },
+  {
+   "slug": "grunge",
+   "name": "grunge",
+   "counts": {
+    "artists": 6,
+    "albums": 9,
+    "songs": 20
+   }
+  }
+ ]
+}

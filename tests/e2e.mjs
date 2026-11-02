@@ -1,4 +1,4 @@
-// End-to-end check in a real Chromium, with MusicBrainz and ListenBrainz served from fixtures.
+// End-to-end check in a real Chromium; data/ is served from the sample in tests/fixtures/data.
 // Run: npm run e2e
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
@@ -10,7 +10,6 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const FIX = (name) => JSON.parse(readFileSync(join(ROOT, 'tests/fixtures', name), 'utf8'));
 const LABELS = ['איזו להקה או אמן?', 'איזה אלבום?', 'איזה שיר?'];
 const LOADING = 'מביאים שאלה…';
 const ERROR = 'לא הצלחנו להביא שאלה. בדקו את החיבור ונסו שוב.';
@@ -29,45 +28,19 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const SITE = `http://127.0.0.1:${server.address().port}/`;
 
-// ---- fake APIs ----
+// ---- data/ is served from the sample in tests/fixtures/data ----
 let mode = 'ok'; // 'ok' | 'fail' | 'slow'
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SAMPLE = join(ROOT, 'tests/fixtures/data');
+const externalRequests = [];
 
-function musicbrainz(url) {
-  const path = url.pathname.replace(/^\/ws\/2/, '');
-  if (path === '/artist') return FIX('mb-artists.json');
-  if (path === '/release-group') return FIX('mb-release-groups.json');
-  const rg = path.match(/^\/release-group\/(.+)$/);
-  if (rg) { // releases specific to this album, so each album gets its own songs
-    const body = FIX('mb-release-group-releases.json');
-    body.releases = body.releases.map((r) => ({ ...r, id: `${r.id}-${rg[1]}` }));
-    return body;
-  }
-  const rel = path.match(/^\/release\/(.+)$/);
-  if (rel) {
-    const body = FIX('mb-release.json');
-    for (const m of body.media) for (const t of m.tracks) t.recording.id = `${t.recording.id}-${rel[1]}`;
-    return body;
-  }
-  return null;
-}
-
-function listenbrainz(url, request) {
-  const entity = url.pathname.split('/').pop().replace('-', '_');
-  const ids = request.postDataJSON()[`${entity}_mbids`] || [];
-  return ids.map((id, i) => ({ [`${entity}_mbid`]: id, total_listen_count: 5000 - i, total_user_count: 1000 - i }));
-}
-
-async function handle(route) {
-  const request = route.request();
-  if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+async function serveData(route) {
   if (mode === 'slow') await sleep(3000);
-  if (mode === 'fail') return route.fulfill({ status: 500, headers: CORS, body: 'down' });
-  const url = new URL(request.url());
-  const body = url.hostname === 'musicbrainz.org' ? musicbrainz(url) : listenbrainz(url, request);
-  if (body === null) return route.fulfill({ status: 404, headers: CORS, body: 'unknown fixture' });
-  return route.fulfill({ status: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (mode === 'fail') return route.fulfill({ status: 500, body: 'down' });
+  const rel = new URL(route.request().url()).pathname.replace(/^\/data\//, '');
+  const file = join(SAMPLE, normalize(rel).replace(/^(\.\.[/\\])+/, ''));
+  if (!existsSync(file)) return route.fulfill({ status: 404, body: 'not found' });
+  return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(file) });
 }
 
 // ---- helpers ----
@@ -75,8 +48,8 @@ const browser = await chromium.launch();
 async function openPage() {
   const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
   page.on('pageerror', (e) => console.error('  page error:', e.message));
-  await page.route('https://musicbrainz.org/**', handle);
-  await page.route('https://api.listenbrainz.org/**', handle);
+  page.on('request', (r) => { if (/musicbrainz\.org|listenbrainz\.org/.test(r.url())) externalRequests.push(r.url()); });
+  await page.route(`${SITE}data/**`, serveData);
   await page.goto(SITE);
   return page;
 }
@@ -118,7 +91,7 @@ await check('choice advances and disables', async () => {
 await check('double click registers once', async () => {
   const page = await openPage();
   await waitForQuestion(page);
-  await page.waitForTimeout(8000); // let Q2 and Q3 arrive so Q1→Q2 is instant
+  await page.waitForTimeout(2000); // let Q2 and Q3 arrive so Q1→Q2 is instant
   const q0 = await pairText(page);
   await page.dblclick('button.option >> nth=1');
   await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, q0, { timeout: T });
@@ -173,6 +146,19 @@ await check('slow network shows loading', async () => {
   const page = await openPage();
   await page.getByText(LOADING).waitFor({ state: 'visible', timeout: T });
   await waitForQuestion(page);
+  await page.close();
+});
+
+await check('never contacts MusicBrainz or ListenBrainz', async () => {
+  externalRequests.length = 0;
+  const page = await openPage();
+  for (let i = 0; i < 5; i++) {
+    await waitForQuestion(page);
+    const before = await pairText(page);
+    await page.click('button.option >> nth=0');
+    await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, before, { timeout: T });
+  }
+  assert(externalRequests.length === 0, `external requests: ${externalRequests.join(', ')}`);
   await page.close();
 });
 
