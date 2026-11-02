@@ -10,16 +10,27 @@
 
 ```text
 data/index.json              { "genres": [ { "slug": "thrash-metal", "name": "thrash metal",
-                                             "counts": { "artists": 30, "albums": 352, "songs": 3410 } } ] }
-data/artists/<genre>.json    [["Metallica", "metallica"], ["Slayer", "slayer"], …]     ← [שם, מפתח קובץ השירים]
-data/albums/<genre>.json     [["Metallica", [["Master of Puppets", 1986], …]], …]
-data/songs/<artist>.json     ["Hit the Lights", "Battery", …]                            ← קובץ לכל אמן
+                                             "counts": { "artists": 30, "albums": 421, "songs": 4604 } } ] }
+data/artists/<genre>.json    [["Metallica", "metallica", "https://…/photo"], …]       ← [שם, מפתח קובץ השירים, תמונה]
+data/albums/<genre>.json     [["Metallica", [["Master of Puppets", 1986, "<cover>"], …]], …]
+data/songs/<artist>.json     [["<cover>", ["Battery", "Master of Puppets", …]], …]   ← קובץ לכל אמן
 ```
 
+**מבנה הקבצים:**
 - **אמנים ואלבומים** נשמרים בקובץ אחד לכל ז'אנר.
-- **שירים** נשמרים בקובץ אחד לכל אמן, משותף לכל הז'אנרים שלו, ובלי אלבום ושנה.
+- **שירים** נשמרים בקובץ אחד לכל אמן, משותף לכל הז'אנרים שלו. השירים מקובצים לפי האלבום, כדי שכל שיר יוצג עם העטיפה שלו.
+
+**תמונות:**
+- **לכל אמן יש תמונה אמיתית,** מאחד המקורות האלה: Wikimedia Commons (דרך MusicBrainz), Deezer או TheAudioDB.
+- **לכל אלבום יש עטיפה:**
+  - העטיפה מגיעה מ-Cover Art Archive, מהוצאה שבנתונים של MusicBrainz מסומן שיש לה עטיפה. במקרה כזה, `<cover>` הוא מזהה ההוצאה.
+  - אם אין עטיפה שם, היא מגיעה מ-Deezer, ואז `<cover>` הוא כתובת מלאה.
+  - אלבום שאין לו עטיפה בשום מקום לא נכלל.
+- **האתר שומר רק כתובות.** הכתובות קבועות, והדפדפן שומר את התמונות ב-cache הרגיל שלו.
+
+**טעינה:**
 - **שאלת שירים** מגרילה שני אמנים ומורידה רק את שני הקבצים שלהם.
-- **כל קובץ נטען רק כשצריך,** ורק פעם אחת.
+- **כל קובץ נטען רק כשצריך,** ורק פעם אחת. התמונות של השאלות הבאות נטענות מראש.
 - **דוגמה קטנה במבנה הזה** נמצאת ב-`tests/fixtures/data/`.
 
 ### בדיקה שהנתונים תקינים
@@ -39,9 +50,16 @@ node tools/check-data.mjs
 - כל אלבומי האולפן שלהם.
 - כל השירים שבאלבומים האלה.
 
-האתר לא פונה לשום API. קוד הבנייה הוסר מהמאגר ונשאר בהיסטוריה של git, בקומיט `6f9e2a7`.
+התמונות נאספו מ-Wikimedia Commons, Deezer, TheAudioDB ו-Cover Art Archive.
 
-**רישיון:** שמות האמנים, האלבומים והשירים מ-MusicBrainz הם CC0. תגיות הז'אנר הן CC BY-NC-SA, כלומר מותרות לשימוש לא מסחרי עם קרדיט. הקרדיט מופיע בתחתית האתר.
+האתר לא פונה לשום API בזמן משחק. קוד הבנייה הוסר מהמאגר ונשאר בהיסטוריה של git, בקומיט `b9bd293`.
+
+**קרדיט ורישיון:**
+- **שמות** האמנים, האלבומים והשירים מ-[MusicBrainz](https://musicbrainz.org) הם CC0.
+- **תגיות הז'אנר** הן CC BY-NC-SA, כלומר מותרות לשימוש לא מסחרי עם קרדיט.
+- **פופולריות:** [ListenBrainz](https://listenbrainz.org).
+- **תמונות אמנים:** [Wikimedia Commons](https://commons.wikimedia.org), תחת רישיונות חופשיים שמופיעים בדף של כל קובץ, וכן [Deezer](https://www.deezer.com) ו-[TheAudioDB](https://www.theaudiodb.com).
+- **עטיפות:** [Cover Art Archive](https://coverartarchive.org).
 
 ## בדיקות
 

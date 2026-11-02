@@ -2,8 +2,9 @@
 //
 //   index.json               { genres: [{ slug, name, counts: { artists, albums, songs } }] }
 //   artists/<slug>.json      [["Artist", "songs-key", "https://photo"], …]
-//   albums/<slug>.json       [["Artist", [["Album", 1986, "release-group-id"], …]], …]
-//   songs/<songs-key>.json   [["release-group-id", ["Song", …]], …]   (one file per artist, shared by genres)
+//   albums/<slug>.json       [["Artist", [["Album", 1986, "cover-ref"], …]], …]
+//   songs/<songs-key>.json   [["cover-ref", ["Song", …]], …]   (one file per artist, shared by genres)
+//   cover-ref: a MusicBrainz release id (Cover Art Archive front cover) or a full image URL
 //
 //   node tools/check-data.mjs [dir]        (default: data)
 import { readFile } from 'node:fs/promises';
@@ -53,7 +54,7 @@ function checkAlbums(path, value, errors) {
     }
     for (const album of albums) {
       if (!(Array.isArray(album) && album.length === 3 && isText(album[0]) && isYear(album[1]) && isText(album[2]))) {
-        errors.push(`${path}: ${name} has an album that is not ["Album", year, "release-group-id"]: ${JSON.stringify(album).slice(0, 60)}`);
+        errors.push(`${path}: ${name} has an album that is not ["Album", year, "cover-ref"]: ${JSON.stringify(album).slice(0, 60)}`);
         return -1;
       }
       count += 1;
@@ -83,7 +84,7 @@ export async function checkData(dir = 'data') {
       if (value !== undefined) {
         const ok = Array.isArray(value) && value.every((g) => Array.isArray(g) && g.length === 2 && isText(g[0]) && Array.isArray(g[1]) && g[1].every(isText));
         if (ok) n = value.reduce((total, [, titles]) => total + titles.length, 0);
-        else errors.push(`${path}: expected [["release-group-id", ["Song", …]], …]`);
+        else errors.push(`${path}: expected [["cover-ref", ["Song", …]], …]`);
       }
       songCounts.set(key, n);
     }
