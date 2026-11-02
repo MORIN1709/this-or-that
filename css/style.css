@@ -91,10 +91,9 @@ h2 { margin: 0; font-size: 1.3rem; }
   font: inherit;
   cursor: pointer;
 }
-#reset { margin-top: auto; }
+#reset { margin-top: auto; margin-bottom: 8px; }
+#skip { display: block; margin: 14px auto 0; }
 
-footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 12px 16px 20px; }
-footer a { color: inherit; }
 
 /* states: loading | question | error */
 .board, .status, .loading-text, .error-text, #retry { display: none; }

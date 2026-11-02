@@ -12,9 +12,14 @@ const $ = (id) => document.getElementById(id);
 const options = [...document.querySelectorAll('button.option')];
 let ticket = 0; // bumps on every show(); stale answers and timers check it
 
+const skip = $('skip');
+
 function setState(state) {
   document.body.dataset.state = state;
-  if (state !== 'question') options.forEach((b) => { b.disabled = true; });
+  if (state !== 'question') {
+    options.forEach((b) => { b.disabled = true; });
+    skip.disabled = true;
+  }
 }
 
 function metaLine(item, type) {
@@ -33,6 +38,7 @@ function render(q) {
     button.classList.remove('chosen');
     button.disabled = false;
   });
+  skip.disabled = false;
   setState('question');
 }
 
@@ -52,10 +58,20 @@ async function show() {
 options.forEach((button) => button.addEventListener('click', () => {
   if (button.disabled) return;
   options.forEach((b) => { b.disabled = true; });
+  skip.disabled = true;
   button.classList.add('chosen');
   const mine = ticket;
   setTimeout(() => { if (mine === ticket) show(); }, CHOICE_FLASH_MS);
 }));
+
+// "עבור": next question without choosing. Same short pause as a choice, so a double tap skips once.
+skip.addEventListener('click', () => {
+  if (skip.disabled) return;
+  options.forEach((b) => { b.disabled = true; });
+  skip.disabled = true;
+  const mine = ticket;
+  setTimeout(() => { if (mine === ticket) show(); }, CHOICE_FLASH_MS);
+});
 
 $('reset').addEventListener('click', () => { game.reset(); show(); });
 $('retry').addEventListener('click', show);

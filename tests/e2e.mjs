@@ -150,6 +150,42 @@ await check('slow network shows loading', async () => {
   await page.close();
 });
 
+await check('skip moves to another question without choosing', async () => {
+  const page = await openPage();
+  await waitForQuestion(page);
+  await page.waitForTimeout(2000); // let the next questions arrive
+  const before = await pairText(page);
+  await page.getByRole('button', { name: 'עבור' }).click();
+  const after = await page.$$eval('button.option', (bs) => ({ chosen: bs.filter((b) => b.classList.contains('chosen')).length, disabled: bs.every((b) => b.disabled) }));
+  assert(after.chosen === 0, 'skip must not mark an option as chosen');
+  assert(after.disabled, 'options are disabled while skipping');
+  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, before, { timeout: T });
+  await waitForQuestion(page);
+  await page.close();
+});
+
+await check('double click on skip skips once', async () => {
+  const page = await openPage();
+  await waitForQuestion(page);
+  await page.waitForTimeout(2000);
+  const q0 = await pairText(page);
+  await page.getByRole('button', { name: 'עבור' }).dblclick();
+  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, q0, { timeout: T });
+  await waitForQuestion(page);
+  const q1 = await pairText(page);
+  await page.waitForTimeout(1500);
+  assert((await pairText(page)) === q1, 'a second question was skipped by the double click');
+  await page.close();
+});
+
+await check('no data credit line on the page', async () => {
+  const page = await openPage();
+  await waitForQuestion(page);
+  const text = await page.evaluate(() => document.body.innerText);
+  assert(!/MusicBrainz|ListenBrainz/.test(text), 'credit line still shown');
+  await page.close();
+});
+
 await check('never contacts MusicBrainz or ListenBrainz', async () => {
   externalRequests.length = 0;
   const page = await openPage();
