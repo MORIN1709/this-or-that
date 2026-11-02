@@ -78,6 +78,20 @@ test('retries 503', async () => {
   assert.ok(c.sleeps.includes(2000), `sleeps: ${c.sleeps}`);
 });
 
+test('retries a dropped connection instead of stopping the build', async () => {
+  const c = clock();
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) throw new TypeError('terminated (ECONNRESET)');
+    return json(200, { ok: 4 });
+  };
+  const f = createFetcher({ cacheDir: await tempCache(), userAgent: UA, fetchImpl, sleep: c.sleep, now: c.now });
+  assert.deepEqual(await f.getJson('https://a.test/reset'), { ok: 4 });
+  assert.equal(calls, 2);
+  assert.ok(c.sleeps.includes(2000), `sleeps: ${c.sleeps}`);
+});
+
 test('a corrupt cache file is fetched again instead of stopping the build', async () => {
   const c = clock();
   const cacheDir = await tempCache();

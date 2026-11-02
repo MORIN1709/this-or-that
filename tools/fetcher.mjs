@@ -50,17 +50,24 @@ export function createFetcher({
       stats.network += 1;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      let res;
       try {
-        const res = await fetchImpl(url, {
+        res = await fetchImpl(url, {
           ...init,
           signal: ctrl.signal,
           headers: { 'User-Agent': userAgent, Accept: 'application/json', ...(init.headers || {}) },
         });
         if (res.ok) return await res.json();
-        const retryable = res.status === 503 || res.status === 429;
-        if (!retryable || attempt === maxAttempts) throw new Error(`HTTP ${res.status} for ${url}`);
+      } catch (err) {
+        // Dropped connection or timeout (seen in practice: ECONNRESET mid-build): wait and retry.
+        if (attempt === maxAttempts) throw err;
+        res = null;
       } finally {
         clearTimeout(timer);
+      }
+      if (res) {
+        const retryable = res.status === 503 || res.status === 429;
+        if (!retryable || attempt === maxAttempts) throw new Error(`HTTP ${res.status} for ${url}`);
       }
       await sleep(2000 * attempt);
     }
