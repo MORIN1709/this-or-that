@@ -67,6 +67,7 @@ h2 { margin: 0; font-size: 1.3rem; }
   border-radius: 16px;
   font: inherit;
   cursor: pointer;
+  touch-action: manipulation;
   transition: transform 0.12s, border-color 0.12s, background 0.12s;
 }
 .option:active { transform: scale(0.98); }

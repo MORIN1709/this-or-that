@@ -1,13 +1,11 @@
-import { createMbClient, createLbClient } from './http.js';
-import { createMusicSources } from './music-sources.js';
+import { createDataSource } from './data-source.js';
 import { createQuestionMaker, pairKey } from './questions.js';
 import { createGame, StaleRoundError } from './game.js';
-import { GENRES, PREFETCH, CHOICE_FLASH_MS } from './config.js';
+import { PREFETCH, CHOICE_FLASH_MS } from './config.js';
 
 const LABELS = { band: 'איזו להקה או אמן?', album: 'איזה אלבום?', song: 'איזה שיר?' };
 
-const sources = createMusicSources({ mb: createMbClient(), lb: createLbClient() });
-const { makeQuestion } = createQuestionMaker({ sources, genres: GENRES });
+const { makeQuestion } = createQuestionMaker({ sources: createDataSource() });
 const game = createGame({ makeQuestion, pairKey, prefetch: PREFETCH });
 
 const $ = (id) => document.getElementById(id);

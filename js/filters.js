@@ -23,19 +23,3 @@ export function isStudioAlbum(rg) {
     && !NOT_STUDIO_TITLE.test(rg.title);
 }
 
-export function dedupeAlbums(albums) {
-  const byKey = new Map();
-  for (const a of albums) {
-    const key = `${a.artist.toLowerCase()}|${normalizeTitle(a.title)}`;
-    const cur = byKey.get(key);
-    if (!cur || (a.year || '9999') < (cur.year || '9999')) byKey.set(key, a);
-  }
-  return [...byKey.values()];
-}
-
-export function topByScore(items, scores, n) {
-  return items
-    .filter((i) => (scores.get(i.id) || 0) > 0)
-    .sort((a, b) => scores.get(b.id) - scores.get(a.id))
-    .slice(0, n);
-}
