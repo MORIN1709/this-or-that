@@ -1,4 +1,4 @@
-// Reads the static music data in data/ (built once by tools/build-data.mjs):
+// Reads the static music data in data/ (a one-time snapshot from MusicBrainz and ListenBrainz):
 //   index.json, artists/<genre>.json ([name, songsKey]), albums/<genre>.json, songs/<songsKey>.json
 // Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
