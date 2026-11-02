@@ -7,15 +7,18 @@ import { buildAll, writeData } from '../tools/build-data.mjs';
 
 // ---- fake API in the shapes the real MusicBrainz / ListenBrainz return ----
 const artist = (id, name, genre) => ({ id, name, type: 'Group', tags: [{ name: genre, count: 10 }] });
-const rel = (rgId, title, year, tracks) => ({
+const rel = (rgId, title, year, tracks, front = true) => ({
   id: `${rgId}-r`, date: `${year}-01-01`, status: 'Official',
+  'cover-art-archive': { artwork: front, front, back: false, count: front ? 1 : 0, darkened: false },
   'release-group': { id: rgId, title, 'primary-type': 'Album', 'secondary-types': [], 'first-release-date': `${year}-01-01` },
   media: [{ format: 'CD', tracks: tracks.map((t) => ({ title: t, recording: { title: t } })) }],
 });
 
 // `images` simulates the image sources: { mbRels: {artistId: relations}, wikidata: {Q: file},
 // audiodb: {artistId: url}, deezer: {name: [{id, name, picture_medium, albums: [titles]}]}, down: Set(host) }
-function fakeFetcher({ searches, releases, images = {} }) {
+// Unless a test passes `images`, every artist has a TheAudioDB photo.
+const everyonePhotographed = { audiodb: new Proxy({}, { get: (_, id) => `https://adb/${String(id)}.jpg` }) };
+function fakeFetcher({ searches, releases, images = everyonePhotographed }) {
   const calls = [];
   return {
     calls,
@@ -41,6 +44,7 @@ function fakeFetcher({ searches, releases, images = {} }) {
       }
       if (u.hostname === 'api.deezer.com') {
         const all = Object.values(images.deezer || {}).flat();
+        if (u.pathname === '/search/album') return { data: images.deezerAlbums || [] };
         const search = u.pathname === '/search/artist';
         if (search) return { data: (images.deezer || {})[u.searchParams.get('q')] || [] };
         const id = Number(u.pathname.match(/\/artist\/(\d+)\/albums/)[1]);
@@ -70,9 +74,9 @@ test('builds nested files for one genre', async () => {
   const fetcher = fakeFetcher({ searches: { 'thrash metal': thrashArtists }, releases: someReleases });
   const { index, files } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 2, minArtists: 2 });
   assert.deepEqual([...files.keys()].sort(), ['albums/thrash-metal.json', 'artists/thrash-metal.json', 'songs/metallica.json', 'songs/slayer.json']);
-  assert.deepEqual(files.get('artists/thrash-metal.json'), [['Metallica', 'metallica', ''], ['Slayer', 'slayer', '']]);
-  assert.deepEqual(files.get('albums/thrash-metal.json')[0], ['Metallica', [['Metallica Album', 1985, 'a0-rg']]]);
-  assert.deepEqual(files.get('songs/metallica.json'), [['a0-rg', ['One', 'Two']]]);
+  assert.deepEqual(files.get('artists/thrash-metal.json'), [['Metallica', 'metallica', 'https://adb/a0.jpg'], ['Slayer', 'slayer', 'https://adb/a1.jpg']]);
+  assert.deepEqual(files.get('albums/thrash-metal.json')[0], ['Metallica', [['Metallica Album', 1985, 'a0-rg-r']]]);
+  assert.deepEqual(files.get('songs/metallica.json'), [['a0-rg-r', ['One', 'Two']]]);
   assert.deepEqual(index.genres, [{ slug: 'thrash-metal', name: 'thrash metal', counts: { artists: 2, albums: 2, songs: 4 } }]);
   const search = new URL(fetcher.calls[0]).searchParams;
   assert.equal(search.get('query'), 'tag:"thrash metal" AND (type:group OR type:person) AND NOT country:IL');
@@ -101,7 +105,7 @@ test('fetches each artist once across genres', async () => {
   });
   const { files } = await buildAll({ fetcher, genres: ['thrash metal', 'heavy metal'], perGenre: 1, minArtists: 1 });
   assert.equal(fetcher.calls.filter((u) => u.includes('artist=a0')).length, 1);
-  assert.deepEqual(files.get('artists/heavy-metal.json'), [['Metallica', 'metallica', '']]);
+  assert.deepEqual(files.get('artists/heavy-metal.json'), [['Metallica', 'metallica', 'https://adb/a0.jpg']]);
   assert.equal([...files.keys()].filter((k) => k.startsWith('songs/')).length, 1, 'one songs file shared by both genres');
 });
 
@@ -178,7 +182,38 @@ test('artist photo: a blocked source is tried once, not once per artist', async 
 });
 
 test('artists still without a photo are listed in the result', async () => {
-  const fetcher = fakeFetcher(oneGenre({}));
+  const fetcher = fakeFetcher(oneGenre({ images: {} }));
   const { missingPhotos } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 4, minArtists: 1 });
   assert.deepEqual(missingPhotos.sort(), ['Anthrax', 'Megadeth', 'Metallica', 'Slayer']);
+});
+
+// ---- every item has a picture ----
+test('an artist without any photo is replaced by the next one in the ranking', async () => {
+  const fetcher = fakeFetcher({ searches: { 'thrash metal': thrashArtists.slice(0, 3) }, releases: someReleases,
+    images: { audiodb: { a0: 'https://adb/a0.jpg', a2: 'https://adb/a2.jpg' } } });
+  const { files, missingPhotos } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 2, minArtists: 1 });
+  assert.deepEqual(files.get('artists/thrash-metal.json').map(([n]) => n), ['Metallica', 'Megadeth']);
+  assert.deepEqual(missingPhotos, ['Slayer']);
+});
+
+test('an album without a Cover Art Archive cover gets the Deezer album cover', async () => {
+  const fetcher = fakeFetcher({ searches: { 'thrash metal': thrashArtists.slice(0, 1) },
+    releases: { a0: [rel('rg1', 'Kill Em All', 1983, ['Hit the Lights'], false)] },
+    images: { audiodb: { a0: 'https://adb/a0.jpg' }, deezerAlbums: [
+      { title: 'Something Else', artist: { name: 'Metallica' }, cover_medium: 'https://dz/wrong.jpg' },
+      { title: 'Kill Em All (Remastered)', artist: { name: 'Metallica' }, cover_medium: 'https://dz/kea.jpg' },
+    ] } });
+  const { files } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 1, minArtists: 1 });
+  assert.deepEqual(files.get('albums/thrash-metal.json'), [['Metallica', [['Kill Em All', 1983, 'https://dz/kea.jpg']]]]);
+  assert.deepEqual(files.get('songs/metallica.json'), [['https://dz/kea.jpg', ['Hit the Lights']]]);
+});
+
+test('an album with no cover anywhere is left out, with its songs', async () => {
+  const fetcher = fakeFetcher({ searches: { 'thrash metal': thrashArtists.slice(0, 1) },
+    releases: { a0: [rel('rg1', 'No Cover', 1983, ['Lost Song'], false), rel('rg2', 'Has Cover', 1984, ['Kept Song'])] },
+    images: { audiodb: { a0: 'https://adb/a0.jpg' } } });
+  const { files, index } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 1, minArtists: 1 });
+  assert.deepEqual(files.get('albums/thrash-metal.json'), [['Metallica', [['Has Cover', 1984, 'rg2-r']]]]);
+  assert.deepEqual(files.get('songs/metallica.json'), [['rg2-r', ['Kept Song']]]);
+  assert.deepEqual(index.genres[0].counts, { artists: 1, albums: 1, songs: 1 });
 });

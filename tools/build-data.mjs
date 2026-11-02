@@ -46,7 +46,7 @@ const AUDIODB_KEY = '123'; // TheAudioDB's public key (the old '2' now answers 4
 // 1. Commons file linked from MusicBrainz, 2. Deezer by name, accepted only when one of its
 // albums matches one of ours (250px), 3. TheAudioDB by MusicBrainz id, 4. Wikidata P18.
 // A source that fails (blocked, down) is skipped for the rest of the build.
-export function createPhotoFinder(fetcher, log) {
+export function createImageFinder(fetcher, log) {
   const down = new Set();
   async function attempt(source, fn) {
     if (down.has(source)) return null;
@@ -79,8 +79,19 @@ export function createPhotoFinder(fetcher, log) {
   const wikidataPhoto = (qid) => attempt('wikidata', async () =>
     wikidataImage(await fetcher.getJson(`https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`), qid));
 
+  // An album cover from Deezer, for albums whose releases have none in the Cover Art Archive.
+  const coverFor = (artistName, title) => attempt('deezer', async () => {
+    const q = `artist:"${artistName}" album:"${title}"`;
+    const found = await fetcher.getJson(`https://api.deezer.com/search/album?q=${encodeURIComponent(q)}`);
+    const want = normalizeTitle(title) || title.toLowerCase();
+    const hit = ((found && found.data) || []).find((a) => (normalizeTitle(a.title) || a.title.toLowerCase()) === want
+      && a.artist && a.artist.name.toLowerCase() === artistName.toLowerCase()
+      && a.cover_medium && !/\/cover\/\//.test(a.cover_medium));
+    return hit ? hit.cover_medium : null;
+  });
+
   // Order: exact and small first; Wikidata (rate-limited here) only for whoever is still missing.
-  return async function photoFor(artist, albums) {
+  async function photoFor(artist, albums) {
     const lookup = await fetcher.getJson(`${MB}/artist/${artist.id}?fmt=json&inc=url-rels`);
     const { file, wikidata } = imageLinks(lookup && lookup.relations);
     if (file) return commonsThumb(file);
@@ -90,7 +101,9 @@ export function createPhotoFinder(fetcher, log) {
     if (fromAudiodb) return fromAudiodb;
     const p18 = wikidata ? await wikidataPhoto(wikidata) : null;
     return p18 ? commonsThumb(p18) : '';
-  };
+  }
+
+  return { photoFor, coverFor };
 }
 
 export async function buildAll({
@@ -101,10 +114,22 @@ export async function buildAll({
   const keyByArtist = new Map();    // …and get one songs file
   const photoByArtist = new Map();  // …and one photo lookup
   const usedKeys = new Set();
-  const photoFor = createPhotoFinder(fetcher, log);
+  const { photoFor, coverFor } = createImageFinder(fetcher, log);
   const namesById = new Map();
   const files = new Map();
   const index = { built, genres: [] };
+
+  // Every album needs a cover: from the Cover Art Archive (checked via the release data), else Deezer;
+  // an album with none anywhere is left out, with its songs.
+  async function withCovers(artist, albums) {
+    const kept = [];
+    for (const album of albums) {
+      if (!album.cover) album.cover = await coverFor(artist.name, album.title);
+      if (album.cover) kept.push(album);
+      else log(`    no cover anywhere, left out: ${artist.name} – ${album.title}`);
+    }
+    return kept;
+  }
 
   for (const genre of genres) {
     log(`genre: ${genre}`);
@@ -112,26 +137,32 @@ export async function buildAll({
     const candidates = (search && search.artists) || [];
     const rows = candidates.length ? await fetcher.postJson(LB_POPULARITY, { artist_mbids: candidates.map((a) => a.id) }) : [];
     const scores = new Map((Array.isArray(rows) ? rows : []).map((r) => [r.artist_mbid, r.total_user_count || 0]));
-    const picked = pickArtists(candidates, scores, genre, perGenre);
-    if (picked.length < minArtists) {
-      log(`  skipped: only ${picked.length} artists after filtering`);
-      continue;
-    }
+    const ranked = pickArtists(candidates, scores, genre, candidates.length);
 
+    // The top `perGenre` artists that have a real photo; one without is replaced by the next in line.
     const entries = [];
-    for (const a of picked) {
+    for (const a of ranked) {
+      if (entries.length >= perGenre) break;
       namesById.set(a.id, a.name);
       if (!albumsByArtist.has(a.id)) {
         log(`  artist: ${a.name}`);
-        albumsByArtist.set(a.id, studioAlbums(await fetchReleases(fetcher, a.id, log)));
+        albumsByArtist.set(a.id, await withCovers(a, studioAlbums(await fetchReleases(fetcher, a.id, log))));
+      }
+      if (!photoByArtist.has(a.id)) photoByArtist.set(a.id, await photoFor(a, albumsByArtist.get(a.id)));
+      if (!photoByArtist.get(a.id)) {
+        log(`  no photo anywhere, replaced by the next artist: ${a.name}`);
+        continue;
       }
       if (!keyByArtist.has(a.id)) {
         const key = artistKey(a, usedKeys);
         keyByArtist.set(a.id, key);
         files.set(`songs/${key}.json`, songList(albumsByArtist.get(a.id)));
       }
-      if (!photoByArtist.has(a.id)) photoByArtist.set(a.id, await photoFor(a, albumsByArtist.get(a.id)));
       entries.push({ name: a.name, key: keyByArtist.get(a.id), image: photoByArtist.get(a.id), albums: albumsByArtist.get(a.id) });
+    }
+    if (entries.length < minArtists) {
+      log(`  skipped: only ${entries.length} artists after filtering`);
+      continue;
     }
 
     const slug = slugify(genre);

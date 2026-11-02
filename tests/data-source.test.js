@@ -49,8 +49,9 @@ test('flattens nested albums', async () => {
   ]);
 });
 
-test('coverUrl points at the 250px Cover Art Archive front cover', () => {
-  assert.equal(coverUrl('abc'), 'https://coverartarchive.org/release-group/abc/front-250');
+test('coverUrl: a release id points at its 250px Cover Art Archive front cover; a full URL is used as is', () => {
+  assert.equal(coverUrl('abc'), 'https://coverartarchive.org/release/abc/front-250');
+  assert.equal(coverUrl('https://cdn-images.dzcdn.net/images/cover/x/250x250.jpg'), 'https://cdn-images.dzcdn.net/images/cover/x/250x250.jpg');
 });
 
 test('lists artists with their songs key, and loads only the drawn artist songs file', async () => {

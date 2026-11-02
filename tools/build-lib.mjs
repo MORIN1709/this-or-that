@@ -62,18 +62,21 @@ function songsOf(release) {
 
 // Studio albums of one artist, each from its earliest release (no deluxe bonus tracks), oldest first.
 export function studioAlbums(releases) {
-  const earliest = new Map(); // release-group id → release
+  const earliest = new Map(); // release-group id → earliest release (its songs)
+  const covered = new Map();  // release-group id → earliest release that has a front cover
+  const sooner = (a, b) => !b || (a.date || '9999') < (b.date || '9999');
   for (const r of releases) {
     const rg = r['release-group'];
     if (!rg || (rg['primary-type'] && rg['primary-type'] !== 'Album')) continue;
     if (!isStudioAlbum(rg) || HEBREW.test(rg.title)) continue;
-    const cur = earliest.get(rg.id);
-    if (!cur || (r.date || '9999') < (cur.date || '9999')) earliest.set(rg.id, r);
+    if (sooner(r, earliest.get(rg.id))) earliest.set(rg.id, r);
+    if (r['cover-art-archive'] && r['cover-art-archive'].front && sooner(r, covered.get(rg.id))) covered.set(rg.id, r);
   }
   const albums = [...earliest.values()]
     .map((r) => {
       const rg = r['release-group'];
-      return { id: rg.id, title: rg.title, year: Number(rg['first-release-date'].slice(0, 4)), songs: songsOf(r) };
+      const cover = covered.get(rg.id);
+      return { id: rg.id, cover: cover ? cover.id : null, title: rg.title, year: Number(rg['first-release-date'].slice(0, 4)), songs: songsOf(r) };
     })
     .sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
 
@@ -106,17 +109,17 @@ function sameSongs(a, b) {
   return smaller.filter((t) => other.has(songKey(t))).length / smaller.length >= 0.5;
 }
 
-// Per-genre files: artists (songs-file key and photo URL) and albums nested by artist, with the
-// MusicBrainz release-group id the site turns into a Cover Art Archive URL.
+// Per-genre files: artists (songs-file key and photo URL) and albums nested by artist, with their
+// cover reference: a MusicBrainz release id (Cover Art Archive) or a full image URL.
 export function genreFiles(entries) {
   return {
     artists: entries.map((e) => [e.name, e.key, e.image || '']),
-    albums: entries.map((e) => [e.name, e.albums.map((a) => [a.title, a.year, a.id])]),
+    albums: entries.map((e) => [e.name, e.albums.map((a) => [a.title, a.year, a.cover])]),
   };
 }
 
-// An artist's songs file: titles grouped by album id, so each song can show its album cover.
-export const songList = (albums) => albums.filter((a) => a.songs.length).map((a) => [a.id, a.songs]);
+// An artist's songs file: titles grouped by their album's cover reference, so each song shows it.
+export const songList = (albums) => albums.filter((a) => a.songs.length).map((a) => [a.cover, a.songs]);
 
 // Stable 250px thumbnail URL of a Wikimedia Commons file.
 export const commonsThumb = (file) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file.replace(/ /g, '_'))}?width=250`;

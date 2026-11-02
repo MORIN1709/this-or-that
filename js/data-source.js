@@ -1,12 +1,13 @@
 // Reads the static music data in data/ (a one-time snapshot from MusicBrainz and ListenBrainz):
-//   index.json, artists/<genre>.json ([name, songsKey, photoUrl]), albums/<genre>.json ([title, year, rgid]),
-//   songs/<songsKey>.json ([[rgid, [titles]], …])
+//   index.json, artists/<genre>.json ([name, songsKey, photoUrl]), albums/<genre>.json ([title, year, coverRef]),
+//   songs/<songsKey>.json ([[coverRef, [titles]], …])
 // Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
 
-// Album cover from the Cover Art Archive (MusicBrainz release-group id). The URL is stable, so the
-// browser's own cache serves repeats.
-export const coverUrl = (releaseGroupId) => `https://coverartarchive.org/release-group/${releaseGroupId}/front-250`;
+// Album cover: a MusicBrainz release id (checked at build time to have a front cover in the Cover Art
+// Archive) or, when only another source had one, its full URL. URLs are stable, so the browser's own
+// cache serves repeats.
+export const coverUrl = (ref) => (ref.startsWith('https://') ? ref : `https://coverartarchive.org/release/${ref}/front-250`);
 
 export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'data/', timeoutMs = 15000 } = {}) {
   const cache = new Map();
@@ -44,12 +45,12 @@ export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'da
     bands: async (genre) => (await file('artists', genre)).map(([name, , image]) => ({ id: itemId('band', '', name), title: name, image })),
 
     albums: async (genre) => (await file('albums', genre)).flatMap(([artist, albums]) =>
-      albums.map(([title, year, rgid]) => ({ id: itemId('album', artist, title), title, artist, year, image: coverUrl(rgid) }))),
+      albums.map(([title, year, cover]) => ({ id: itemId('album', artist, title), title, artist, year, image: coverUrl(cover) }))),
 
     // Song questions draw two artists, then load only those two artists' song files.
     artists: async (genre) => (await file('artists', genre)).map(([name, key]) => ({ name, key })),
 
-    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`)).flatMap(([rgid, titles]) =>
-      titles.map((title) => ({ id: itemId('song', name, title), title, artist: name, image: coverUrl(rgid) }))),
+    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`)).flatMap(([cover, titles]) =>
+      titles.map((title) => ({ id: itemId('song', name, title), title, artist: name, image: coverUrl(cover) }))),
   };
 }

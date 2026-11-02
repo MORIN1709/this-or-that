@@ -57,11 +57,12 @@ test('pickArtists prefers genre-in-top-3 artists, then fills from top 5', () => 
 });
 
 // Builds a release in the shape of /ws/2/release?artist=…&inc=recordings+release-groups
-function release({ rg, rgTitle, first, secondary = [], date, tracks, format = 'CD', extraMedia = [] }) {
+function release({ rg, rgTitle, first, secondary = [], date, tracks, format = 'CD', extraMedia = [], front = true }) {
   return {
     id: `${rg}-${date}`,
     date,
     status: 'Official',
+    'cover-art-archive': { artwork: front, front, back: false, count: front ? 1 : 0, darkened: false },
     'release-group': {
       id: rg, title: rgTitle, 'primary-type': 'Album', 'secondary-types': secondary, 'first-release-date': first,
     },
@@ -76,9 +77,18 @@ test('studioAlbums: one album per release group, from its earliest release, year
     release({ rg: 'kea', rgTitle: 'Kill ’Em All', first: '1983-07-25', date: '1983-07-25', tracks: ['Hit the Lights'] }),
   ]);
   assert.deepEqual(albums, [
-    { id: 'kea', title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] },
-    { id: 'mop', title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Master of Puppets'] },
+    { id: 'kea', cover: 'kea-1983-07-25', title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] },
+    { id: 'mop', cover: 'mop-1986-03-03', title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Master of Puppets'] },
   ]);
+});
+
+test('studioAlbums takes the cover from the earliest release that has one, or none', () => {
+  const albums = studioAlbums([
+    release({ rg: 'a', rgTitle: 'First', first: '1980-01-01', date: '1980-01-01', tracks: ['x'], front: false }),
+    release({ rg: 'a', rgTitle: 'First', first: '1980-01-01', date: '1999-01-01', tracks: ['x', 'bonus'] }),
+    release({ rg: 'b', rgTitle: 'Second', first: '1982-01-01', date: '1982-01-01', tracks: ['y'], front: false }),
+  ]);
+  assert.deepEqual(albums.map((a) => [a.title, a.cover, a.songs]), [['First', 'a-1999-01-01', ['x']], ['Second', null, ['y']]]);
 });
 
 test('studioAlbums skips live groups, compilation titles and video media', () => {
@@ -90,7 +100,7 @@ test('studioAlbums skips live groups, compilation titles and video media', () =>
       extraMedia: [{ format: 'DVD-Video', tracks: [{ title: 'Enter Sandman (video)', recording: {} }] }],
     }),
   ]);
-  assert.deepEqual(albums, [{ id: 'blk', title: 'Metallica', year: 1991, songs: ['Enter Sandman'] }]);
+  assert.deepEqual(albums, [{ id: 'blk', cover: 'blk-1991-08-12', title: 'Metallica', year: 1991, songs: ['Enter Sandman'] }]);
 });
 
 test('studioAlbums filters demo/live versions only in brackets or after a dash', () => {
@@ -140,26 +150,26 @@ test('different albums with the same title are kept when their songs differ (sel
   assert.deepEqual(albums.map((a) => [a.title, a.year]), [['Weezer', 1994], ['Weezer', 2001]]);
 });
 
-test('genreFiles: artists with songs key and image, albums with their id', () => {
+test('genreFiles: artists with songs key and photo, albums with their cover reference', () => {
   const files = genreFiles([
-    { name: 'Metallica', key: 'metallica', image: 'https://img/m', albums: [{ id: 'kea', title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] }, { id: 'mop', title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Orion'] }] },
-    { name: 'Slayer', key: 'slayer', image: '', albums: [{ id: 'rib', title: 'Reign in Blood', year: 1986, songs: ['Angel of Death'] }] },
+    { name: 'Metallica', key: 'metallica', image: 'https://img/m', albums: [{ id: 'kea', cover: 'r-kea', title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] }, { id: 'mop', cover: 'https://dz/mop.jpg', title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Orion'] }] },
+    { name: 'Slayer', key: 'slayer', image: '', albums: [{ id: 'rib', cover: 'r-rib', title: 'Reign in Blood', year: 1986, songs: ['Angel of Death'] }] },
   ]);
   assert.deepEqual(files, {
     artists: [['Metallica', 'metallica', 'https://img/m'], ['Slayer', 'slayer', '']],
     albums: [
-      ['Metallica', [['Kill ’Em All', 1983, 'kea'], ['Master of Puppets', 1986, 'mop']]],
-      ['Slayer', [['Reign in Blood', 1986, 'rib']]],
+      ['Metallica', [['Kill ’Em All', 1983, 'r-kea'], ['Master of Puppets', 1986, 'https://dz/mop.jpg']]],
+      ['Slayer', [['Reign in Blood', 1986, 'r-rib']]],
     ],
   });
 });
 
-test('songList groups song titles by album id and skips albums without songs', () => {
+test('songList groups song titles by album cover reference and skips albums without songs', () => {
   assert.deepEqual(songList([
-    { id: 'a', title: 'A', year: 1983, songs: ['x', 'y'] },
-    { id: 'e', title: 'Empty', year: 1984, songs: [] },
-    { id: 'b', title: 'B', year: 1986, songs: ['z'] },
-  ]), [['a', ['x', 'y']], ['b', ['z']]]);
+    { id: 'a', cover: 'ca', title: 'A', year: 1983, songs: ['x', 'y'] },
+    { id: 'e', cover: 'ce', title: 'Empty', year: 1984, songs: [] },
+    { id: 'b', cover: 'https://dz/b.jpg', title: 'B', year: 1986, songs: ['z'] },
+  ]), [['ca', ['x', 'y']], ['https://dz/b.jpg', ['z']]]);
 });
 
 test('commonsThumb builds a stable 250px Commons URL for a file name', () => {
