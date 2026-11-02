@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>זה או זה · רוק ומטאל</title>
+<meta name="description" content="משחק בחירות אינסופי בין להקות, אלבומים ושירים של רוק ומטאל">
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body data-state="loading">
+<main>
+  <header>
+    <h1>זה או זה</h1>
+    <p class="sub">רוק ומטאל</p>
+  </header>
+
+  <section class="board" aria-live="polite">
+    <div class="ask">
+      <h2 id="question-label"></h2>
+      <span id="genre" class="genre" dir="ltr"></span>
+    </div>
+    <div class="options">
+      <button class="option" type="button"><span class="title" dir="auto"></span><span class="meta" dir="auto"></span></button>
+      <span class="or" aria-hidden="true">או</span>
+      <button class="option" type="button"><span class="title" dir="auto"></span><span class="meta" dir="auto"></span></button>
+    </div>
+  </section>
+
+  <p class="status" role="status">
+    <span class="loading-text">מביאים שאלה…</span>
+    <span class="error-text">לא הצלחנו להביא שאלה. בדקו את החיבור ונסו שוב.</span>
+  </p>
+  <button id="retry" class="secondary" type="button">נסה שוב</button>
+  <button id="reset" class="secondary" type="button">ערבוב מחדש</button>
+</main>
+<footer>
+  נתונים: <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a>
+  · פופולריות: <a href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a>
+</footer>
+</body>
+</html>

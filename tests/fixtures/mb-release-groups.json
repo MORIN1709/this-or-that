@@ -1,0 +1,229 @@
+{
+ "created": "2026-11-02T00:00:00.000Z",
+ "count": 12,
+ "offset": 0,
+ "release-groups": [
+  {
+   "id": "ea9a3ac3-2fd7-5602-8de5-8065e8fef113",
+   "title": "Master of Puppets",
+   "primary-type": "Album",
+   "first-release-date": "1986-03-03",
+   "artist-credit": [
+    {
+     "name": "Metallica",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "3dc86a9a-5e5d-53ad-8e4f-19b5836edfc0",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "8701b373-a52e-5925-838a-6aa4ebc768fb",
+   "title": "...And Justice for All",
+   "primary-type": "Album",
+   "first-release-date": "1988-08-25",
+   "artist-credit": [
+    {
+     "name": "Metallica",
+     "joinphrase": " & "
+    },
+    {
+     "name": "Friends",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "b5a8d500-40f8-577a-93bf-f193607c9e8d",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "605acd82-58e9-5b0a-9f46-ee520f257b1d",
+   "title": "Rust in Peace",
+   "primary-type": "Album",
+   "first-release-date": "1990-09-24",
+   "artist-credit": [
+    {
+     "name": "Megadeth",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "a104120a-c6a5-5f21-b256-f4c8b32c8028",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "e865aece-8f71-578e-9adb-3b6506115397",
+   "title": "Reign in Blood",
+   "primary-type": "Album",
+   "first-release-date": "1986-10-07",
+   "artist-credit": [
+    {
+     "name": "Slayer",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "c076c120-2066-5fb8-8b34-b65ace2f72ed",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "6673f052-cac1-5d21-9421-441647b84cbe",
+   "title": "Among the Living",
+   "primary-type": "Album",
+   "first-release-date": "1987-03-22",
+   "artist-credit": [
+    {
+     "name": "Anthrax",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "9a26d336-5b20-5bf9-bca2-39e7a4950bff",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "70ba3848-7dc3-541c-8e36-44f848669b81",
+   "title": "The Legacy",
+   "primary-type": "Album",
+   "first-release-date": "1987-04-21",
+   "artist-credit": [
+    {
+     "name": "Testament",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "90ca3647-fb8c-52fc-bd7f-e2df4e5b8726",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "a2e450a3-e2ad-5a8f-ba7f-789561627a3c",
+   "title": "Bonded by Blood",
+   "primary-type": "Album",
+   "first-release-date": "1985-04-25",
+   "artist-credit": [
+    {
+     "name": "Exodus",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "b6cfcd65-a2e6-516e-8d99-3df8f485e8c6",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "a2887efe-5b29-5795-a87b-8fdbabf08564",
+   "title": "A Very Long Album Title That Keeps Going and Going Past Any Reasonable Width",
+   "primary-type": "Album",
+   "first-release-date": "1989-02-01",
+   "artist-credit": [
+    {
+     "name": "Exodus",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "a32c238a-bd86-51cd-ad0b-7522b83e3bbf",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "4a731579-7c4e-5c93-bc1e-d3f0a159dac7",
+   "title": "Live Shit: Binge & Purge",
+   "primary-type": "Album",
+   "first-release-date": "1993-11-23",
+   "artist-credit": [
+    {
+     "name": "Metallica",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "816e807a-4d5d-537a-8f91-26da2373c968",
+     "status": "Official"
+    }
+   ],
+   "secondary-types": [
+    "Live"
+   ]
+  },
+  {
+   "id": "764ca0da-9c72-5cf6-8138-08026df3a13e",
+   "title": "Greatest Hits",
+   "primary-type": "Album",
+   "first-release-date": "2008-05-27",
+   "artist-credit": [
+    {
+     "name": "Megadeth",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "a63c20c5-cf35-5252-890f-38b0f07fcdb6",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "130815e5-c630-58a4-aa63-caeda1ec1854",
+   "title": "Master of Puppets (Remastered)",
+   "primary-type": "Album",
+   "first-release-date": "2017-11-10",
+   "artist-credit": [
+    {
+     "name": "Metallica",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "2404a394-364c-5b52-829e-0fa269e64569",
+     "status": "Official"
+    }
+   ]
+  },
+  {
+   "id": "620bf68f-7d41-5783-b9df-8bc476eefa4a",
+   "title": "No Date Album",
+   "primary-type": "Album",
+   "artist-credit": [
+    {
+     "name": "Slayer",
+     "joinphrase": ""
+    }
+   ],
+   "releases": [
+    {
+     "id": "7e594992-2be0-5827-ba86-21df3ffa5265",
+     "status": "Official"
+    }
+   ]
+  }
+ ]
+}

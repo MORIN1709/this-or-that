@@ -1,0 +1,9 @@
+{
+  "name": "this-or-that",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "e2e": "node tests/e2e.mjs"
+  }
+}

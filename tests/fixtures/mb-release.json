@@ -1,0 +1,93 @@
+{
+ "id": "rel-early",
+ "title": "Master of Puppets",
+ "media": [
+  {
+   "format": "CD",
+   "tracks": [
+    {
+     "title": "Battery",
+     "recording": {
+      "id": "92f1af13-23a9-52bc-af2b-d975a44ff579",
+      "title": "Battery"
+     }
+    },
+    {
+     "title": "Master of Puppets",
+     "recording": {
+      "id": "230e690f-ca1a-51cc-a968-ae81b0e6632f",
+      "title": "Master of Puppets"
+     }
+    },
+    {
+     "title": "The Thing That Should Not Be",
+     "recording": {
+      "id": "9fe38ab7-46fc-5377-893e-d3c552463723",
+      "title": "The Thing That Should Not Be"
+     }
+    },
+    {
+     "title": "Welcome Home (Sanitarium)",
+     "recording": {
+      "id": "5aadcc0c-8d52-55ee-90da-82a75a273eda",
+      "title": "Welcome Home (Sanitarium)"
+     }
+    },
+    {
+     "title": "Disposable Heroes",
+     "recording": {
+      "id": "3d3e7f22-de17-5675-85ee-749de6e74f66",
+      "title": "Disposable Heroes"
+     }
+    },
+    {
+     "title": "Leper Messiah",
+     "recording": {
+      "id": "e8d541d7-3ae1-53d7-b49f-b6c240e10d9b",
+      "title": "Leper Messiah"
+     }
+    },
+    {
+     "title": "Orion",
+     "recording": {
+      "id": "764b9cde-b624-5d3f-8ee7-2db9c5eb8a89",
+      "title": "Orion"
+     }
+    },
+    {
+     "title": "Damage, Inc.",
+     "recording": {
+      "id": "ad2baa00-d775-5bec-99fc-3548d0646802",
+      "title": "Damage, Inc."
+     }
+    },
+    {
+     "title": "Orion (live)",
+     "recording": {
+      "id": "0e73b91e-8ec3-5fc1-9828-0b4eebfcea09",
+      "title": "Orion (live)"
+     }
+    },
+    {
+     "title": "Battery (demo)",
+     "recording": {
+      "id": "25bc1fe7-b441-53bf-85f3-ffa326345504",
+      "title": "Battery (demo)"
+     }
+    }
+   ]
+  },
+  {
+   "format": "DVD-Video",
+   "tracks": [
+    {
+     "title": "Battery (5.1 mix)",
+     "recording": {
+      "id": "135c2412-1b15-59ad-946c-69c9f52c6df4",
+      "title": "Battery"
+     }
+    }
+   ]
+  }
+ ]
+}
