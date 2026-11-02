@@ -77,6 +77,20 @@ test('never pairs items with the same displayed text', async () => {
   assert.deepEqual([q.a.title, q.b.title].sort(), ['Battery', 'Intro']);
 });
 
+test('items that only differ in case or punctuation are not paired', async () => {
+  const songs = [
+    { id: 's0', title: 'Self‐Destruct', artist: 'Band' },
+    { id: 's1', title: 'Self-Destruct', artist: 'Band' },
+    { id: 's2', title: 'INTRO', artist: 'Band' },
+    { id: 's3', title: 'Intro', artist: 'band' },
+  ];
+  const sources = fakeSources({ genres: ['g1'], songs: { g1: songs } });
+  // pick (0,1): look-alike; pick (2,3): look-alike; pick (0,2): fine
+  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0, 0, 0.5, 0.7, 0, 0.4, 0.1) });
+  const q = await maker.makeQuestion();
+  assert.deepEqual([q.a.id, q.b.id].sort(), ['s0', 's2']);
+});
+
 test('a missing genre file falls back to another genre', async () => {
   const sources = fakeSources({ genres: ['g1', 'g2'], songs: { g1: new Error('HTTP 404'), g2: items('song', 3) } });
   // attempt 1: song/g1 fails; attempt 2: song/g2

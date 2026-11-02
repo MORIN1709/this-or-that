@@ -3,8 +3,10 @@ export const QUESTION_TYPES = ['band', 'album', 'song'];
 // Same two items in either order are the same question.
 export const pairKey = (q) => [q.a.id, q.b.id].sort().join('|');
 
-// What the player sees on a button; two items with the same text are never paired.
-const shown = (item) => `${item.title}\u0000${item.artist || ''}`;
+// What the player sees on a button, ignoring case, punctuation and dash variants;
+// two items that look the same are never paired.
+const fold = (text) => text.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');
+const shown = (item) => `${fold(item.title)}\u0000${fold(item.artist || '')}`;
 
 export function createQuestionMaker({ sources, random = Math.random, maxTries = 5 }) {
   const index = (n) => Math.floor(random() * n);

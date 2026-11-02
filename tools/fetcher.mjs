@@ -3,7 +3,7 @@
 // - identifies itself with a User-Agent, as MusicBrainz requires
 // - every successful answer is cached on disk, so an interrupted build resumes without re-fetching
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export function createFetcher({
@@ -24,11 +24,15 @@ export function createFetcher({
       stats.cached += 1;
       return value;
     } catch (err) {
-      if (err.code !== 'ENOENT') throw err;
+      if (err instanceof SyntaxError) console.warn(`Corrupt cache file, fetching again: ${file}`);
+      else if (err.code !== 'ENOENT') throw err;
     }
     const value = await load();
     await mkdir(cacheDir, { recursive: true });
-    await writeFile(file, JSON.stringify(value));
+    // Write then rename: a build killed mid-write never leaves a half-written cache file behind.
+    const temp = `${file}.${process.pid}.tmp`;
+    await writeFile(temp, JSON.stringify(value));
+    await rename(temp, file);
     return value;
   }
 

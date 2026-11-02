@@ -2,15 +2,22 @@
 // Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
 
-export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'data/' } = {}) {
+export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'data/', timeoutMs = 15000 } = {}) {
   const cache = new Map();
 
+  // A stalled download (weak mobile signal) is aborted, so the player gets "try again" instead of endless loading.
   function load(path) {
     if (!cache.has(path)) {
       const p = (async () => {
-        const res = await fetchImpl(base + path);
-        if (!res.ok) throw new Error(`HTTP ${res.status} for ${base}${path}`);
-        return res.json();
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          const res = await fetchImpl(base + path, { signal: ctrl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status} for ${base}${path}`);
+          return await res.json();
+        } finally {
+          clearTimeout(timer);
+        }
       })();
       cache.set(path, p);
       p.catch(() => cache.delete(path));

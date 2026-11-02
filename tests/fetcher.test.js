@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFetcher } from '../tools/fetcher.mjs';
@@ -75,6 +76,27 @@ test('retries 503', async () => {
   const f = createFetcher({ cacheDir: await tempCache(), userAgent: UA, fetchImpl, sleep: c.sleep, now: c.now });
   assert.deepEqual(await f.getJson('https://a.test/r'), { ok: 2 });
   assert.ok(c.sleeps.includes(2000), `sleeps: ${c.sleeps}`);
+});
+
+test('a corrupt cache file is fetched again instead of stopping the build', async () => {
+  const c = clock();
+  const cacheDir = await tempCache();
+  const url = 'https://a.test/corrupt';
+  const file = join(cacheDir, `${createHash('sha1').update(url).digest('hex')}.json`);
+  await writeFile(file, '{"releases": [1, 2');
+  const fetchImpl = fakeFetch([json(200, { ok: 3 })], c);
+  const f = createFetcher({ cacheDir, userAgent: UA, fetchImpl, sleep: c.sleep, now: c.now });
+  const original = console.warn;
+  const warnings = [];
+  console.warn = (...a) => warnings.push(a.join(' '));
+  try {
+    assert.deepEqual(await f.getJson(url), { ok: 3 });
+  } finally {
+    console.warn = original;
+  }
+  assert.ok(warnings.some((w) => w.includes(file)), warnings.join('\n'));
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { ok: 3 });
+  assert.deepEqual((await readdir(cacheDir)).filter((n) => !n.endsWith('.json')), [], 'no temp files left');
 });
 
 test('does not cache errors', async () => {

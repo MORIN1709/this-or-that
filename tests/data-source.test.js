@@ -71,6 +71,19 @@ test('a failed file is retried on the next call', async () => {
   assert.equal((await data.songs('thrash metal')).length, 3);
 });
 
+test('a stalled file times out, and the next call tries again', { timeout: 3000 }, async () => {
+  let calls = 0;
+  const fetchImpl = (url, init = {}) => {
+    calls += 1;
+    if (url.endsWith('index.json')) return Promise.resolve({ ok: true, status: 200, json: async () => INDEX });
+    if (calls <= 2) return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timed out'))));
+    return Promise.resolve({ ok: true, status: 200, json: async () => FILES['data/songs/thrash-metal.json'] });
+  };
+  const data = createDataSource({ fetchImpl, timeoutMs: 50 });
+  await assert.rejects(data.songs('thrash metal'));
+  assert.equal((await data.songs('thrash metal')).length, 3);
+});
+
 test('a missing file rejects with the status', async () => {
   const data = createDataSource({ fetchImpl: fakeFetch() });
   await assert.rejects(data.songs('grunge'), /404/);

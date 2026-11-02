@@ -13,6 +13,10 @@ const HEBREW = /[֐-׿]/;
 const VIDEO_MEDIUM = /dvd|blu-?ray|video/i;
 // A version, not a song: "(demo)", "[live at …]", "Orion - Live". "Live Wire" stays.
 const NOT_A_SONG = /[([]\s*[^)\]]*\b(demo|live|remix|instrumental|karaoke)\b[^)\]]*[)\]]|\s-\s.*\b(demo|live|remix|instrumental|karaoke)\b/i;
+// MusicBrainz placeholder titles such as "[silence]", "[untitled]", "[data track]".
+const PLACEHOLDER = /^\[[^\]]*\]$/;
+// Same song regardless of case, punctuation or unicode dashes.
+const songKey = (title) => normalizeTitle(title) || title.toLowerCase();
 
 export const slugify = (name) => name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -46,8 +50,8 @@ function songsOf(release) {
     if (VIDEO_MEDIUM.test(medium.format || '')) continue;
     for (const track of medium.tracks || []) {
       const title = track.title;
-      if (!title || NOT_A_SONG.test(title) || HEBREW.test(title)) continue;
-      const key = normalizeTitle(title) || title;
+      if (!title || NOT_A_SONG.test(title) || PLACEHOLDER.test(title.trim()) || HEBREW.test(title)) continue;
+      const key = songKey(title);
       if (seen.has(key)) continue;
       seen.add(key);
       songs.push(title);
@@ -66,15 +70,40 @@ export function studioAlbums(releases) {
     const cur = earliest.get(rg.id);
     if (!cur || (r.date || '9999') < (cur.date || '9999')) earliest.set(rg.id, r);
   }
-  const byTitle = new Map(); // normalized title → album (same album released as separate groups)
-  for (const r of earliest.values()) {
-    const rg = r['release-group'];
-    const album = { title: rg.title, year: Number(rg['first-release-date'].slice(0, 4)), songs: songsOf(r) };
-    const key = normalizeTitle(rg.title) || rg.title;
-    const cur = byTitle.get(key);
-    if (!cur || album.year < cur.year) byTitle.set(key, album);
+  const albums = [...earliest.values()]
+    .map((r) => {
+      const rg = r['release-group'];
+      return { title: rg.title, year: Number(rg['first-release-date'].slice(0, 4)), songs: songsOf(r) };
+    })
+    .sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
+
+  // Same title is the same album only when the songs mostly match (a remaster), not for
+  // different self-titled albums (Weezer's blue and green albums). The earliest one stays.
+  const kept = [];
+  for (const album of albums) {
+    const key = normalizeTitle(album.title) || album.title;
+    const twin = kept.find((k) => (normalizeTitle(k.title) || k.title) === key && sameSongs(k.songs, album.songs));
+    if (!twin) kept.push(album);
   }
-  return [...byTitle.values()].sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
+
+  // A song already on an earlier album (re-recordings, compilations of old songs) appears once.
+  const seen = new Set();
+  for (const album of kept) {
+    album.songs = album.songs.filter((title) => {
+      const k = songKey(title);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+  return kept;
+}
+
+function sameSongs(a, b) {
+  const smaller = a.length <= b.length ? a : b;
+  if (smaller.length === 0) return true; // nothing to compare: treat as the same album
+  const other = new Set((smaller === a ? b : a).map(songKey));
+  return smaller.filter((t) => other.has(songKey(t))).length / smaller.length >= 0.5;
 }
 
 // The three per-genre files, nested by artist (and album) so names aren't repeated per song.

@@ -117,6 +117,29 @@ test('dedupes unicode variants of the same album title, keeping the earliest', (
   assert.deepEqual(albums.map((a) => [a.title, a.year]), [['…And Justice for All', 1988], ['Hardwired… to Self‐Destruct', 2016]]);
 });
 
+test('a song already on an earlier album of the artist is not repeated (re-recordings, spelling variants)', () => {
+  const albums = studioAlbums([
+    release({ rg: 'bbb', rgTitle: 'Bonded by Blood', first: '1985-04-25', date: '1985-04-25', tracks: ['Bonded by Blood', 'Piranha', 'Self‐Destruct'] }),
+    release({ rg: 'ltbb', rgTitle: 'Let There Be Blood', first: '2008-10-24', date: '2008-10-24', tracks: ['Bonded by Blood', 'PIRANHA', 'Self-Destruct', 'New Song'] }),
+  ]);
+  assert.deepEqual(albums.map((a) => a.songs), [['Bonded by Blood', 'Piranha', 'Self‐Destruct'], ['New Song']]);
+});
+
+test('placeholder track titles are not songs', () => {
+  const [album] = studioAlbums([release({
+    rg: 'r', rgTitle: 'Album', first: '1990-01-01', date: '1990-01-01', tracks: ['[silence]', '[untitled]', '[data track]', 'Real Song'],
+  })]);
+  assert.deepEqual(album.songs, ['Real Song']);
+});
+
+test('different albums with the same title are kept when their songs differ (self-titled albums)', () => {
+  const albums = studioAlbums([
+    release({ rg: 'blue', rgTitle: 'Weezer', first: '1994-05-10', date: '1994-05-10', tracks: ['Buddy Holly', 'Say It Ain’t So'] }),
+    release({ rg: 'green', rgTitle: 'Weezer', first: '2001-05-15', date: '2001-05-15', tracks: ['Hash Pipe', 'Island in the Sun'] }),
+  ]);
+  assert.deepEqual(albums.map((a) => [a.title, a.year]), [['Weezer', 1994], ['Weezer', 2001]]);
+});
+
 test('genreFiles builds the nested artists/albums/songs structure in input order', () => {
   const files = genreFiles([
     { name: 'Metallica', albums: [{ title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] }, { title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Orion'] }] },

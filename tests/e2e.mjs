@@ -31,7 +31,8 @@ const SITE = `http://127.0.0.1:${server.address().port}/`;
 // ---- data/ is served from the sample in tests/fixtures/data ----
 let mode = 'ok'; // 'ok' | 'fail' | 'slow'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const SAMPLE = join(ROOT, 'tests/fixtures/data');
+// E2E_DATA=data runs against the real data instead of the sample.
+const SAMPLE = join(ROOT, process.env.E2E_DATA || 'tests/fixtures/data');
 const externalRequests = [];
 
 async function serveData(route) {
