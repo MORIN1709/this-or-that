@@ -6,19 +6,21 @@
 
 ## מבנה הנתונים
 
-`data/` מחולקת לפי תת-ז'אנר. כל ז'אנר מופיע ב-`index.json`, ויש לו שלושה קבצים:
+`data/` בנויה כך:
 
 ```text
 data/index.json              { "genres": [ { "slug": "thrash-metal", "name": "thrash metal",
                                              "counts": { "artists": 30, "albums": 352, "songs": 3410 } } ] }
-data/artists/<slug>.json     ["Metallica", "Slayer", …]
-data/albums/<slug>.json      [["Metallica", [["Master of Puppets", 1986], …]], …]
-data/songs/<slug>.json       [["Metallica", [["Master of Puppets", 1986, ["Battery", …]], …]], …]
+data/artists/<genre>.json    [["Metallica", "metallica"], ["Slayer", "slayer"], …]     ← [שם, מפתח קובץ השירים]
+data/albums/<genre>.json     [["Metallica", [["Master of Puppets", 1986], …]], …]
+data/songs/<artist>.json     ["Hit the Lights", "Battery", …]                            ← קובץ לכל אמן
 ```
 
-- האתר טוען כל קובץ רק כשהוא צריך אותו לשאלה, ורק פעם אחת.
-- לכל סוג בכל ז'אנר צריכים להיות לפחות 2 פריטים.
-- בתיקייה `tests/fixtures/data/` יש דוגמה קטנה במבנה הזה.
+- **אמנים ואלבומים** נשמרים בקובץ אחד לכל ז'אנר.
+- **שירים** נשמרים בקובץ אחד לכל אמן, משותף לכל הז'אנרים שלו, ובלי אלבום ושנה.
+- **שאלת שירים** מגרילה שני אמנים ומורידה רק את שני הקבצים שלהם.
+- **כל קובץ נטען רק כשצריך,** ורק פעם אחת.
+- **דוגמה קטנה במבנה הזה** נמצאת ב-`tests/fixtures/data/`.
 
 ### בדיקה שהנתונים תקינים
 

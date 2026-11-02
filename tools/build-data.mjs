@@ -3,6 +3,7 @@
 //   node tools/build-data.mjs                      # all genres
 //   node tools/build-data.mjs --genres "thrash metal,grunge"
 //
+// Files: artists/<genre>.json, albums/<genre>.json, songs/<artist>.json (shared by all genres).
 // For each genre: the 30 most-listened artists (MusicBrainz tag search, ranked by ListenBrainz),
 // all their studio albums, and every song on those albums. Polite: <= 1 request per 1.1s,
 // identified by User-Agent, cached in .cache/http so an interrupted run resumes.
@@ -10,7 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createFetcher } from './fetcher.mjs';
-import { GENRES, slugify, pickArtists, studioAlbums, genreFiles } from './build-lib.mjs';
+import { GENRES, slugify, pickArtists, studioAlbums, genreFiles, songList, artistKey } from './build-lib.mjs';
 
 const MB = 'https://musicbrainz.org/ws/2';
 const LB_POPULARITY = 'https://api.listenbrainz.org/1/popularity/artist';
@@ -43,6 +44,8 @@ export async function buildAll({
   built = new Date().toISOString().slice(0, 10), log = () => {},
 }) {
   const albumsByArtist = new Map(); // artists shared between genres are fetched once
+  const keyByArtist = new Map();    // …and get one songs file
+  const usedKeys = new Set();
   const files = new Map();
   const index = { built, genres: [] };
 
@@ -64,14 +67,20 @@ export async function buildAll({
         log(`  artist: ${a.name}`);
         albumsByArtist.set(a.id, studioAlbums(await fetchReleases(fetcher, a.id, log)));
       }
-      entries.push({ name: a.name, albums: albumsByArtist.get(a.id) });
+      if (!keyByArtist.has(a.id)) {
+        const key = artistKey(a, usedKeys);
+        keyByArtist.set(a.id, key);
+        files.set(`songs/${key}.json`, songList(albumsByArtist.get(a.id)));
+      }
+      entries.push({ name: a.name, key: keyByArtist.get(a.id), albums: albumsByArtist.get(a.id) });
     }
 
     const slug = slugify(genre);
     const shaped = genreFiles(entries);
-    for (const type of ['artists', 'albums', 'songs']) files.set(`${type}/${slug}.json`, shaped[type]);
+    files.set(`artists/${slug}.json`, shaped.artists);
+    files.set(`albums/${slug}.json`, shaped.albums);
     const albums = entries.reduce((n, e) => n + e.albums.length, 0);
-    const songs = entries.reduce((n, e) => n + e.albums.reduce((m, al) => m + al.songs.length, 0), 0);
+    const songs = entries.reduce((n, e) => n + songList(e.albums).length, 0);
     index.genres.push({ slug, name: genre, counts: { artists: entries.length, albums, songs } });
   }
   return { index, files };

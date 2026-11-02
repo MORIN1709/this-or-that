@@ -47,9 +47,10 @@ const someReleases = Object.fromEntries(thrashArtists.map((a, i) => [a.id, [rel(
 test('builds nested files for one genre', async () => {
   const fetcher = fakeFetcher({ searches: { 'thrash metal': thrashArtists }, releases: someReleases });
   const { index, files } = await buildAll({ fetcher, genres: ['thrash metal'], perGenre: 2, minArtists: 2 });
-  assert.deepEqual([...files.keys()].sort(), ['albums/thrash-metal.json', 'artists/thrash-metal.json', 'songs/thrash-metal.json']);
-  assert.deepEqual(files.get('artists/thrash-metal.json'), ['Metallica', 'Slayer']);
-  assert.deepEqual(files.get('songs/thrash-metal.json')[0], ['Metallica', [['Metallica Album', 1985, ['One', 'Two']]]]);
+  assert.deepEqual([...files.keys()].sort(), ['albums/thrash-metal.json', 'artists/thrash-metal.json', 'songs/metallica.json', 'songs/slayer.json']);
+  assert.deepEqual(files.get('artists/thrash-metal.json'), [['Metallica', 'metallica'], ['Slayer', 'slayer']]);
+  assert.deepEqual(files.get('albums/thrash-metal.json')[0], ['Metallica', [['Metallica Album', 1985]]]);
+  assert.deepEqual(files.get('songs/metallica.json'), ['One', 'Two']);
   assert.deepEqual(index.genres, [{ slug: 'thrash-metal', name: 'thrash metal', counts: { artists: 2, albums: 2, songs: 4 } }]);
   const search = new URL(fetcher.calls[0]).searchParams;
   assert.equal(search.get('query'), 'tag:"thrash metal" AND (type:group OR type:person) AND NOT country:IL');
@@ -76,8 +77,10 @@ test('fetches each artist once across genres', async () => {
     searches: { 'thrash metal': [shared], 'heavy metal': [shared] },
     releases: { a0: [rel('rg', 'Master of Puppets', 1986, ['Battery'])] },
   });
-  await buildAll({ fetcher, genres: ['thrash metal', 'heavy metal'], perGenre: 1, minArtists: 1 });
+  const { files } = await buildAll({ fetcher, genres: ['thrash metal', 'heavy metal'], perGenre: 1, minArtists: 1 });
   assert.equal(fetcher.calls.filter((u) => u.includes('artist=a0')).length, 1);
+  assert.deepEqual(files.get('artists/heavy-metal.json'), [['Metallica', 'metallica']]);
+  assert.equal([...files.keys()].filter((k) => k.startsWith('songs/')).length, 1, 'one songs file shared by both genres');
 });
 
 test('drops a genre with fewer than 5 artists', async () => {

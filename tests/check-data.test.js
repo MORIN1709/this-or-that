@@ -29,9 +29,9 @@ test('reports a missing index', async () => {
 
 test('reports a missing genre file', async () => {
   const dir = await copyOfSample();
-  await rm(join(dir, 'songs/grunge.json'));
+  await rm(join(dir, 'songs/nirvana.json'));
   const r = await checkData(dir);
-  assert.ok(r.errors.some((e) => e.includes('songs/grunge.json')), r.errors.join('\n'));
+  assert.ok(r.errors.some((e) => e.includes('songs/nirvana.json')), r.errors.join('\n'));
 });
 
 test('reports a wrongly shaped album entry', async () => {
@@ -43,9 +43,9 @@ test('reports a wrongly shaped album entry', async () => {
 
 test('reports a song list that is not an array of strings', async () => {
   const dir = await copyOfSample();
-  await edit(dir, 'songs/grunge.json', (s) => { s[0][1][0][2] = 'Blew'; return s; });
+  await edit(dir, 'songs/nirvana.json', () => 'Blew');
   const r = await checkData(dir);
-  assert.ok(r.errors.some((e) => e.includes('songs/grunge.json')), r.errors.join('\n'));
+  assert.ok(r.errors.some((e) => e.includes('songs/nirvana.json')), r.errors.join('\n'));
 });
 
 test('reports counts that do not match the files', async () => {
@@ -57,8 +57,15 @@ test('reports counts that do not match the files', async () => {
 
 test('reports a genre with fewer than 2 items of a type', async () => {
   const dir = await copyOfSample();
-  await edit(dir, 'artists/grunge.json', () => ['Nirvana']);
+  await edit(dir, 'artists/grunge.json', () => [['Nirvana', 'nirvana']]);
   await edit(dir, 'index.json', (i) => { i.genres[1].counts.artists = 1; return i; });
   const r = await checkData(dir);
   assert.ok(r.errors.some((e) => e.includes('artists/grunge.json') && e.includes('at least 2')), r.errors.join('\n'));
+});
+
+test('reports an artist entry without a songs file key', async () => {
+  const dir = await copyOfSample();
+  await edit(dir, 'artists/grunge.json', (a) => { a[0] = ['Nirvana']; return a; });
+  const r = await checkData(dir);
+  assert.ok(r.errors.some((e) => e.includes('artists/grunge.json')), r.errors.join('\n'));
 });

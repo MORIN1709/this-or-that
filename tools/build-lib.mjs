@@ -106,11 +106,24 @@ function sameSongs(a, b) {
   return smaller.filter((t) => other.has(songKey(t))).length / smaller.length >= 0.5;
 }
 
-// The three per-genre files, nested by artist (and album) so names aren't repeated per song.
+// Per-genre files: artists (with the key of their songs file) and albums nested by artist.
 export function genreFiles(entries) {
   return {
-    artists: entries.map((e) => e.name),
+    artists: entries.map((e) => [e.name, e.key]),
     albums: entries.map((e) => [e.name, e.albums.map((a) => [a.title, a.year])]),
-    songs: entries.map((e) => [e.name, e.albums.map((a) => [a.title, a.year, a.songs])]),
   };
+}
+
+// An artist's songs file holds only titles: album and year aren't shown in song questions.
+export const songList = (albums) => albums.flatMap((a) => a.songs);
+
+// File key for an artist's songs: the slug of the name; non-Latin names, and a second artist
+// with a name already taken, get the start of the MusicBrainz id. `used` tracks keys handed out.
+export function artistKey(artist, used) {
+  const slug = slugify(artist.name);
+  const short = artist.id.slice(0, 8);
+  let key = slug || `artist-${short}`;
+  if (used.has(key)) key = `${key}-${short}`;
+  used.add(key);
+  return key;
 }

@@ -1,4 +1,5 @@
-// Reads the static music data in data/ (built once by tools/build-data.mjs).
+// Reads the static music data in data/ (built once by tools/build-data.mjs):
+//   index.json, artists/<genre>.json ([name, songsKey]), albums/<genre>.json, songs/<songsKey>.json
 // Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
 
@@ -35,12 +36,15 @@ export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'da
   return {
     genres: async () => (await load('index.json')).genres.map((g) => g.name),
 
-    bands: async (genre) => (await file('artists', genre)).map((name) => ({ id: itemId('band', '', name), title: name })),
+    bands: async (genre) => (await file('artists', genre)).map(([name]) => ({ id: itemId('band', '', name), title: name })),
 
     albums: async (genre) => (await file('albums', genre)).flatMap(([artist, albums]) =>
       albums.map(([title, year]) => ({ id: itemId('album', artist, title), title, artist, year }))),
 
-    songs: async (genre) => (await file('songs', genre)).flatMap(([artist, albums]) =>
-      albums.flatMap(([, year, songs]) => songs.map((title) => ({ id: itemId('song', artist, title), title, artist, year })))),
+    // Song questions draw two artists, then load only those two artists' song files.
+    artists: async (genre) => (await file('artists', genre)).map(([name, key]) => ({ name, key })),
+
+    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`))
+      .map((title) => ({ id: itemId('song', name, title), title, artist: name })),
   };
 }

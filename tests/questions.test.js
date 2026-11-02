@@ -11,7 +11,8 @@ function seq(...values) {
 const items = (prefix, n) => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, title: `${prefix} ${i}` }));
 
 // `lists[type][genre]` is an array, or an Error to simulate a file that fails to load.
-function fakeSources({ genres = ['g1'], bands = {}, albums = {}, songs = {} } = {}) {
+// `artists[genre]` lists { name, key }; `songs[key]` lists that artist's songs.
+function fakeSources({ genres = ['g1'], bands = {}, albums = {}, artists = {}, songs = {} } = {}) {
   const calls = [];
   const answer = (list) => {
     if (list instanceof Error) throw list;
@@ -22,7 +23,8 @@ function fakeSources({ genres = ['g1'], bands = {}, albums = {}, songs = {} } = 
     genres: async () => genres,
     bands: async (g) => { calls.push(['bands', g]); return answer(bands[g]); },
     albums: async (g) => { calls.push(['albums', g]); return answer(albums[g]); },
-    songs: async (g) => { calls.push(['songs', g]); return answer(songs[g]); },
+    artists: async (g) => { calls.push(['artists', g]); return answer(artists[g]); },
+    songsOf: async (a) => { calls.push(['songsOf', a.key]); return answer(songs[a.key]); },
   };
 }
 
@@ -53,48 +55,58 @@ test('album question: two different albums of the drawn genre', async () => {
   assert.ok(list.includes(q.a) && list.includes(q.b));
 });
 
-test('song question: two different songs from all songs of the genre', async () => {
-  const list = items('song', 6);
-  const sources = fakeSources({ genres: ['punk'], songs: { punk: list } });
-  // type 0.7 → song, genre 0, pick i=0.5→3, j=0.9→4→5, order 0.1
-  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0.5, 0.9, 0.1) });
+const ART = [{ name: 'A', key: 'a' }, { name: 'B', key: 'b' }, { name: 'C', key: 'c' }];
+const songsOf = (key, n) => Array.from({ length: n }, (_, i) => ({ id: `${key}${i}`, title: `${key} song ${i}`, artist: key.toUpperCase() }));
+
+test('song question: one song from each of two different artists of the genre', async () => {
+  const sources = fakeSources({ genres: ['punk'], artists: { punk: ART }, songs: { a: songsOf('a', 3), b: songsOf('b', 3), c: songsOf('c', 3) } });
+  // type 0.7 → song, genre 0, artists i=0.5→B, j=0.9→C, song of B 0, song of C 0.4→1, order 0.1
+  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0.5, 0.9, 0, 0.4, 0.1) });
   const q = await maker.makeQuestion();
   assert.equal(q.type, 'song');
-  assert.deepEqual([q.a.id, q.b.id].sort(), ['song3', 'song5']);
-  assert.deepEqual(sources.calls, [['songs', 'punk']]);
+  assert.deepEqual([q.a.id, q.b.id], ['b0', 'c1']);
+  assert.deepEqual(sources.calls, [['artists', 'punk'], ['songsOf', 'b'], ['songsOf', 'c']], 'only the two drawn artists are loaded');
+});
+
+test('song question retries when a drawn artist has no songs', async () => {
+  const sources = fakeSources({ artists: { g1: ART }, songs: { a: [], b: songsOf('b', 2), c: songsOf('c', 2) } });
+  // attempt 1: A and B (A has none); attempt 2: B and C
+  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0, 0, 0.7, 0, 0.5, 0.9, 0, 0, 0.1) });
+  const q = await maker.makeQuestion();
+  assert.deepEqual([q.a.id, q.b.id], ['b0', 'c0']);
 });
 
 test('never pairs items with the same displayed text', async () => {
-  const songs = [
-    { id: 's0', title: 'Intro', artist: 'Band' },
-    { id: 's1', title: 'Intro', artist: 'Band' },
-    { id: 's2', title: 'Battery', artist: 'Band' },
+  const albums = [
+    { id: 'x0', title: 'Intro', artist: 'Band' },
+    { id: 'x1', title: 'Intro', artist: 'Band' },
+    { id: 'x2', title: 'Battery', artist: 'Band' },
   ];
-  const sources = fakeSources({ genres: ['g1'], songs: { g1: songs } });
-  // type song, genre g1; first pick 0 & 1 (both "Intro") is rejected; second pick 0 & 2
-  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0, 0, 0, 0.6, 0.1) });
+  const sources = fakeSources({ albums: { g1: albums } });
+  // type 0.4 → album; first pick 0 & 1 (both "Intro") is rejected; second pick 0 & 2
+  const maker = createQuestionMaker({ sources, random: seq(0.4, 0, 0, 0, 0, 0.6, 0.1) });
   const q = await maker.makeQuestion();
   assert.deepEqual([q.a.title, q.b.title].sort(), ['Battery', 'Intro']);
 });
 
 test('items that only differ in case or punctuation are not paired', async () => {
-  const songs = [
-    { id: 's0', title: 'Self‐Destruct', artist: 'Band' },
-    { id: 's1', title: 'Self-Destruct', artist: 'Band' },
-    { id: 's2', title: 'INTRO', artist: 'Band' },
-    { id: 's3', title: 'Intro', artist: 'band' },
+  const bands = [
+    { id: 's0', title: 'Self‐Destruct' },
+    { id: 's1', title: 'Self-Destruct' },
+    { id: 's2', title: 'INTRO' },
+    { id: 's3', title: 'Intro' },
   ];
-  const sources = fakeSources({ genres: ['g1'], songs: { g1: songs } });
+  const sources = fakeSources({ bands: { g1: bands } });
   // pick (0,1): look-alike; pick (2,3): look-alike; pick (0,2): fine
-  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0, 0, 0.5, 0.7, 0, 0.4, 0.1) });
+  const maker = createQuestionMaker({ sources, random: seq(0, 0, 0, 0, 0.5, 0.7, 0, 0.4, 0.1) });
   const q = await maker.makeQuestion();
   assert.deepEqual([q.a.id, q.b.id].sort(), ['s0', 's2']);
 });
 
 test('a missing genre file falls back to another genre', async () => {
-  const sources = fakeSources({ genres: ['g1', 'g2'], songs: { g1: new Error('HTTP 404'), g2: items('song', 3) } });
+  const sources = fakeSources({ genres: ['g1', 'g2'], artists: { g1: new Error('HTTP 404'), g2: ART }, songs: { a: songsOf('a', 2), b: songsOf('b', 2), c: songsOf('c', 2) } });
   // attempt 1: song/g1 fails; attempt 2: song/g2
-  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0.7, 0.6, 0, 0, 0.1) });
+  const maker = createQuestionMaker({ sources, random: seq(0.7, 0, 0.7, 0.6, 0, 0, 0, 0, 0.1) });
   const original = console.warn;
   const warnings = [];
   console.warn = (...a) => warnings.push(a.join(' '));

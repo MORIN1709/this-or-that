@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GENRES, slugify, isMainTag, pickArtists, studioAlbums, genreFiles } from '../tools/build-lib.mjs';
+import { GENRES, slugify, isMainTag, pickArtists, studioAlbums, genreFiles, artistKey, songList } from '../tools/build-lib.mjs';
 
 test('GENRES keeps the 18 rock and metal tags', () => {
   assert.equal(GENRES.length, 18);
@@ -140,20 +140,28 @@ test('different albums with the same title are kept when their songs differ (sel
   assert.deepEqual(albums.map((a) => [a.title, a.year]), [['Weezer', 1994], ['Weezer', 2001]]);
 });
 
-test('genreFiles builds the nested artists/albums/songs structure in input order', () => {
+test('genreFiles: artists with their songs key, albums nested by artist', () => {
   const files = genreFiles([
-    { name: 'Metallica', albums: [{ title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] }, { title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Orion'] }] },
-    { name: 'Slayer', albums: [{ title: 'Reign in Blood', year: 1986, songs: ['Angel of Death'] }, { title: 'South of Heaven', year: 1988, songs: ['South of Heaven'] }] },
+    { name: 'Metallica', key: 'metallica', albums: [{ title: 'Kill ’Em All', year: 1983, songs: ['Hit the Lights'] }, { title: 'Master of Puppets', year: 1986, songs: ['Battery', 'Orion'] }] },
+    { name: 'Slayer', key: 'slayer', albums: [{ title: 'Reign in Blood', year: 1986, songs: ['Angel of Death'] }] },
   ]);
   assert.deepEqual(files, {
-    artists: ['Metallica', 'Slayer'],
+    artists: [['Metallica', 'metallica'], ['Slayer', 'slayer']],
     albums: [
       ['Metallica', [['Kill ’Em All', 1983], ['Master of Puppets', 1986]]],
-      ['Slayer', [['Reign in Blood', 1986], ['South of Heaven', 1988]]],
-    ],
-    songs: [
-      ['Metallica', [['Kill ’Em All', 1983, ['Hit the Lights']], ['Master of Puppets', 1986, ['Battery', 'Orion']]]],
-      ['Slayer', [['Reign in Blood', 1986, ['Angel of Death']], ['South of Heaven', 1988, ['South of Heaven']]]],
+      ['Slayer', [['Reign in Blood', 1986]]],
     ],
   });
+});
+
+test('songList flattens the albums of an artist into song titles only', () => {
+  assert.deepEqual(songList([{ title: 'A', year: 1983, songs: ['x', 'y'] }, { title: 'B', year: 1986, songs: ['z'] }]), ['x', 'y', 'z']);
+});
+
+test('artistKey: slug, with the id prefix for non-Latin names and repeated names', () => {
+  const used = new Set();
+  assert.equal(artistKey({ id: 'aaaaaaaa-1111', name: 'Metallica' }, used), 'metallica');
+  assert.equal(artistKey({ id: 'bbbbbbbb-2222', name: 'Ария' }, used), 'artist-bbbbbbbb');
+  assert.equal(artistKey({ id: 'cccccccc-3333', name: 'Metallica' }, used), 'metallica-cccccccc');
+  assert.equal(artistKey({ id: 'dddddddd-4444', name: 'Guns N’ Roses' }, used), 'guns-n-roses');
 });

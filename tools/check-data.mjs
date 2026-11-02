@@ -1,9 +1,9 @@
 // Checks that a data/ folder has exactly the shape the site reads (js/data-source.js):
 //
 //   index.json               { genres: [{ slug, name, counts: { artists, albums, songs } }] }
-//   artists/<slug>.json      ["Artist", …]
+//   artists/<slug>.json      [["Artist", "songs-key"], …]
 //   albums/<slug>.json       [["Artist", [["Album", 1986], …]], …]
-//   songs/<slug>.json        [["Artist", [["Album", 1986, ["Song", …]], …]], …]
+//   songs/<songs-key>.json   ["Song", …]                       (one file per artist, shared by genres)
 //
 //   node tools/check-data.mjs [dir]        (default: data)
 import { readFile } from 'node:fs/promises';
@@ -22,16 +22,18 @@ async function readJson(dir, path, errors) {
   }
 }
 
-// Each check returns the number of items it found, or -1 when the file has the wrong shape.
+// Returns the [name, key] entries, or null when the file has the wrong shape.
 function checkArtists(path, value, errors) {
-  if (!Array.isArray(value) || !value.every(isText)) {
-    errors.push(`${path}: expected an array of artist names`);
-    return -1;
+  const ok = Array.isArray(value) && value.every((e) => Array.isArray(e) && e.length === 2 && isText(e[0]) && isText(e[1]));
+  if (!ok) {
+    errors.push(`${path}: expected an array of ["Artist", "songs-key"]`);
+    return null;
   }
-  return value.length;
+  return value;
 }
 
-function checkNested(path, value, errors, withSongs) {
+// Returns the number of albums, or -1 when the file has the wrong shape.
+function checkAlbums(path, value, errors) {
   if (!Array.isArray(value)) {
     errors.push(`${path}: expected an array of [artist, albums]`);
     return -1;
@@ -45,14 +47,11 @@ function checkNested(path, value, errors, withSongs) {
       return -1;
     }
     for (const album of albums) {
-      const ok = Array.isArray(album) && isText(album[0]) && isYear(album[1])
-        && (withSongs ? album.length === 3 && Array.isArray(album[2]) && album[2].every(isText) : album.length === 2);
-      if (!ok) {
-        const shape = withSongs ? '["Album", year, ["Song", …]]' : '["Album", year]';
-        errors.push(`${path}: ${name} has an album that is not ${shape}: ${JSON.stringify(album).slice(0, 60)}`);
+      if (!(Array.isArray(album) && album.length === 2 && isText(album[0]) && isYear(album[1]))) {
+        errors.push(`${path}: ${name} has an album that is not ["Album", year]: ${JSON.stringify(album).slice(0, 60)}`);
         return -1;
       }
-      count += withSongs ? album[2].length : 1;
+      count += 1;
     }
   }
   return count;
@@ -61,26 +60,57 @@ function checkNested(path, value, errors, withSongs) {
 export async function checkData(dir = 'data') {
   const errors = [];
   const index = await readJson(dir, 'index.json', errors);
-  if (!index) return { ok: false, errors };
+  if (!index) {
+    if (errors.length === 0) errors.push('index.json: empty');
+    return { ok: false, errors };
+  }
   if (!Array.isArray(index.genres) || index.genres.length === 0) {
     errors.push('index.json: expected a non-empty "genres" array');
     return { ok: false, errors };
   }
+  // Song files are shared between genres, so each is read and checked once.
+  const songCounts = new Map();
+  async function songCount(key) {
+    if (!songCounts.has(key)) {
+      const path = `songs/${key}.json`;
+      const value = await readJson(dir, path, errors);
+      let n = -1;
+      if (value !== undefined) {
+        if (Array.isArray(value) && value.every(isText)) n = value.length;
+        else errors.push(`${path}: expected an array of song titles`);
+      }
+      songCounts.set(key, n);
+    }
+    return songCounts.get(key);
+  }
+
   for (const genre of index.genres) {
     if (!isText(genre.slug) || !isText(genre.name)) {
       errors.push(`index.json: genre ${JSON.stringify(genre).slice(0, 60)} needs "slug" and "name"`);
       continue;
     }
+    const artists = checkArtists(`artists/${genre.slug}.json`, await readJson(dir, `artists/${genre.slug}.json`, errors), errors);
     const found = {
-      artists: checkArtists(`artists/${genre.slug}.json`, await readJson(dir, `artists/${genre.slug}.json`, errors), errors),
-      albums: checkNested(`albums/${genre.slug}.json`, await readJson(dir, `albums/${genre.slug}.json`, errors), errors, false),
-      songs: checkNested(`songs/${genre.slug}.json`, await readJson(dir, `songs/${genre.slug}.json`, errors), errors, true),
+      artists: artists ? artists.length : -1,
+      albums: checkAlbums(`albums/${genre.slug}.json`, await readJson(dir, `albums/${genre.slug}.json`, errors), errors),
+      songs: -1,
     };
+    if (artists) {
+      let total = 0;
+      let withSongs = 0;
+      for (const [, key] of artists) {
+        const n = await songCount(key);
+        if (n > 0) withSongs += 1;
+        total += Math.max(n, 0);
+      }
+      found.songs = total;
+      if (withSongs < 2) errors.push(`artists/${genre.slug}.json: a song question needs at least 2 artists with songs, has ${withSongs}`);
+    }
     for (const [type, n] of Object.entries(found)) {
       if (n < 0) continue;
-      if (n < 2) errors.push(`${type}/${genre.slug}.json: needs at least 2 items for a question, has ${n}`);
+      if (type !== 'songs' && n < 2) errors.push(`${type}/${genre.slug}.json: needs at least 2 items for a question, has ${n}`);
       const claimed = genre.counts && genre.counts[type];
-      if (claimed !== undefined && claimed !== n) errors.push(`index.json: ${genre.slug} counts.${type} is ${claimed} but the file has ${n}`);
+      if (claimed !== undefined && claimed !== n) errors.push(`index.json: ${genre.slug} counts.${type} is ${claimed} but the files have ${n}`);
     }
   }
   return { ok: errors.length === 0, errors };
