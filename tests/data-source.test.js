@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDataSource } from '../js/data-source.js';
+import { createDataSource, coverUrl } from '../js/data-source.js';
 
 const INDEX = { built: '2026-11-02', genres: [{ slug: 'thrash-metal', name: 'thrash metal', counts: {} }, { slug: 'grunge', name: 'grunge', counts: {} }] };
 const FILES = {
   'data/index.json': INDEX,
-  'data/artists/thrash-metal.json': [['Metallica', 'metallica'], ['Slayer', 'slayer']],
-  'data/albums/thrash-metal.json': [['Metallica', [['Kill ’Em All', 1983], ['Master of Puppets', 1986]]]],
-  'data/songs/metallica.json': ['Hit the Lights', 'Battery', 'Orion'],
+  'data/artists/thrash-metal.json': [['Metallica', 'metallica', 'https://img.test/metallica.jpg'], ['Slayer', 'slayer', 'https://img.test/slayer.jpg']],
+  'data/albums/thrash-metal.json': [['Metallica', [['Kill ’Em All', 1983, 'rg-kea'], ['Master of Puppets', 1986, 'rg-mop']]]],
+  'data/songs/metallica.json': [['rg-kea', ['Hit the Lights']], ['rg-mop', ['Battery', 'Orion']]],
 };
 
 function fakeFetch(files = FILES) {
@@ -35,6 +35,7 @@ test('loads index once and maps name to slug', async () => {
   await data.bands('thrash metal');
   await data.albums('thrash metal');
   assert.deepEqual(bands.map((b) => b.title), ['Metallica', 'Slayer']);
+  assert.equal(bands[0].image, 'https://img.test/metallica.jpg');
   assert.equal(fetchImpl.calls.filter((u) => u === 'data/index.json').length, 1);
   assert.equal(fetchImpl.calls.filter((u) => u === 'data/artists/thrash-metal.json').length, 1);
 });
@@ -42,22 +43,26 @@ test('loads index once and maps name to slug', async () => {
 test('flattens nested albums', async () => {
   const data = createDataSource({ fetchImpl: fakeFetch() });
   const albums = await data.albums('thrash metal');
-  assert.deepEqual(albums.map(({ title, artist, year }) => ({ title, artist, year })), [
-    { title: 'Kill ’Em All', artist: 'Metallica', year: 1983 },
-    { title: 'Master of Puppets', artist: 'Metallica', year: 1986 },
+  assert.deepEqual(albums.map(({ title, artist, year, image }) => ({ title, artist, year, image })), [
+    { title: 'Kill ’Em All', artist: 'Metallica', year: 1983, image: coverUrl('rg-kea') },
+    { title: 'Master of Puppets', artist: 'Metallica', year: 1986, image: coverUrl('rg-mop') },
   ]);
+});
+
+test('coverUrl points at the 250px Cover Art Archive front cover', () => {
+  assert.equal(coverUrl('abc'), 'https://coverartarchive.org/release-group/abc/front-250');
 });
 
 test('lists artists with their songs key, and loads only the drawn artist songs file', async () => {
   const fetchImpl = fakeFetch();
   const data = createDataSource({ fetchImpl });
   const artists = await data.artists('thrash metal');
-  assert.deepEqual(artists, [{ name: 'Metallica', key: 'metallica' }, { name: 'Slayer', key: 'slayer' }]);
+  assert.deepEqual(artists.map(({ name, key }) => ({ name, key })), [{ name: 'Metallica', key: 'metallica' }, { name: 'Slayer', key: 'slayer' }]);
   const songs = await data.songsOf(artists[0]);
-  assert.deepEqual(songs.map(({ title, artist }) => ({ title, artist })), [
-    { title: 'Hit the Lights', artist: 'Metallica' },
-    { title: 'Battery', artist: 'Metallica' },
-    { title: 'Orion', artist: 'Metallica' },
+  assert.deepEqual(songs.map(({ title, artist, image }) => ({ title, artist, image })), [
+    { title: 'Hit the Lights', artist: 'Metallica', image: coverUrl('rg-kea') },
+    { title: 'Battery', artist: 'Metallica', image: coverUrl('rg-mop') },
+    { title: 'Orion', artist: 'Metallica', image: coverUrl('rg-mop') },
   ]);
   assert.equal(new Set(songs.map((x) => x.id)).size, 3);
   assert.ok(fetchImpl.calls.includes('data/songs/metallica.json'));
@@ -65,7 +70,7 @@ test('lists artists with their songs key, and loads only the drawn artist songs 
 });
 
 test('ids differ for non-Latin names (no collapse to empty)', async () => {
-  const files = { ...FILES, 'data/artists/thrash-metal.json': [['Ария', 'artist-1'], ['Кино', 'artist-2'], ['X Japan', 'x-japan']] };
+  const files = { ...FILES, 'data/artists/thrash-metal.json': [['Ария', 'artist-1', ''], ['Кино', 'artist-2', ''], ['X Japan', 'x-japan', '']] };
   const data = createDataSource({ fetchImpl: fakeFetch(files) });
   const bands = await data.bands('thrash metal');
   assert.equal(new Set(bands.map((b) => b.id)).size, 3);

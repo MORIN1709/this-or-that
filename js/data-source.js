@@ -1,7 +1,12 @@
 // Reads the static music data in data/ (a one-time snapshot from MusicBrainz and ListenBrainz):
-//   index.json, artists/<genre>.json ([name, songsKey]), albums/<genre>.json, songs/<songsKey>.json
+//   index.json, artists/<genre>.json ([name, songsKey, photoUrl]), albums/<genre>.json ([title, year, rgid]),
+//   songs/<songsKey>.json ([[rgid, [titles]], …])
 // Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
+
+// Album cover from the Cover Art Archive (MusicBrainz release-group id). The URL is stable, so the
+// browser's own cache serves repeats.
+export const coverUrl = (releaseGroupId) => `https://coverartarchive.org/release-group/${releaseGroupId}/front-250`;
 
 export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'data/', timeoutMs = 15000 } = {}) {
   const cache = new Map();
@@ -36,15 +41,15 @@ export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'da
   return {
     genres: async () => (await load('index.json')).genres.map((g) => g.name),
 
-    bands: async (genre) => (await file('artists', genre)).map(([name]) => ({ id: itemId('band', '', name), title: name })),
+    bands: async (genre) => (await file('artists', genre)).map(([name, , image]) => ({ id: itemId('band', '', name), title: name, image })),
 
     albums: async (genre) => (await file('albums', genre)).flatMap(([artist, albums]) =>
-      albums.map(([title, year]) => ({ id: itemId('album', artist, title), title, artist, year }))),
+      albums.map(([title, year, rgid]) => ({ id: itemId('album', artist, title), title, artist, year, image: coverUrl(rgid) }))),
 
     // Song questions draw two artists, then load only those two artists' song files.
     artists: async (genre) => (await file('artists', genre)).map(([name, key]) => ({ name, key })),
 
-    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`))
-      .map((title) => ({ id: itemId('song', name, title), title, artist: name })),
+    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`)).flatMap(([rgid, titles]) =>
+      titles.map((title) => ({ id: itemId('song', name, title), title, artist: name, image: coverUrl(rgid) }))),
   };
 }

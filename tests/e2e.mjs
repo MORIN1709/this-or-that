@@ -34,6 +34,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // E2E_DATA=data runs against the real data instead of the sample.
 const SAMPLE = join(ROOT, process.env.E2E_DATA || 'tests/fixtures/data');
 const externalRequests = [];
+let imageMode = 'ok'; // 'ok' | 'broken'
+const imageRequests = [];
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+async function serveImage(route) {
+  imageRequests.push(route.request().url());
+  if (imageMode === 'broken') return route.fulfill({ status: 404, body: 'no image' });
+  return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+}
 
 async function serveData(route) {
   if (mode === 'slow') await sleep(3000);
@@ -51,6 +59,7 @@ async function openPage() {
   page.on('pageerror', (e) => console.error('  page error:', e.message));
   page.on('request', (r) => { if (/musicbrainz\.org|listenbrainz\.org/.test(r.url())) externalRequests.push(r.url()); });
   await page.route(`${SITE}data/**`, serveData);
+  await page.route(/img\.test|coverartarchive\.org|wikimedia\.org|dzcdn\.net|theaudiodb\.com/, serveImage);
   await page.goto(SITE);
   return page;
 }
@@ -65,6 +74,7 @@ const pairText = (page) => page.$$eval('button.option .title', (els) => els.map(
 const results = [];
 async function check(name, fn) {
   mode = 'ok';
+  imageMode = 'ok';
   try { await fn(); results.push([name, true]); console.log(`ok - ${name}`); }
   catch (e) { results.push([name, false]); console.log(`not ok - ${name}\n  ${e.message.split('\n')[0]}`); }
 }
@@ -183,6 +193,39 @@ await check('no data credit line on the page', async () => {
   await waitForQuestion(page);
   const text = await page.evaluate(() => document.body.innerText);
   assert(!/MusicBrainz|ListenBrainz/.test(text), 'credit line still shown');
+  await page.close();
+});
+
+await check('every option shows its picture', async () => {
+  const page = await openPage();
+  await waitForQuestion(page);
+  await page.waitForFunction(() => [...document.querySelectorAll('button.option img')].every((i) => i.complete && i.naturalWidth > 0 && i.offsetParent !== null), null, { timeout: T });
+  const srcs = await page.$$eval('button.option img', (imgs) => imgs.map((i) => i.getAttribute('src')));
+  assert(srcs.length === 2 && srcs.every((s) => /^https:/.test(s)), `srcs: ${srcs}`);
+  await page.close();
+});
+
+await check('a picture that fails to load shows the first letter instead', async () => {
+  imageMode = 'broken';
+  const page = await openPage();
+  await waitForQuestion(page);
+  await page.waitForFunction(() => [...document.querySelectorAll('button.option')].every((b) => b.classList.contains('no-image')), null, { timeout: T });
+  const shown = await page.$$eval('button.option', (bs) => bs.map((b) => ({
+    letter: b.querySelector('.initial').textContent,
+    first: b.querySelector('.title').textContent.trim().charAt(0).toUpperCase(),
+    letterVisible: b.querySelector('.initial').offsetParent !== null,
+    imgVisible: b.querySelector('img').offsetParent !== null,
+  })));
+  assert(shown.every((x) => x.letter === x.first && x.letterVisible && !x.imgVisible), JSON.stringify(shown));
+  await page.close();
+});
+
+await check('pictures of the next questions are loaded ahead', async () => {
+  imageRequests.length = 0;
+  const page = await openPage();
+  await waitForQuestion(page);
+  await page.waitForTimeout(2000);
+  assert(new Set(imageRequests).size >= 4, `only ${new Set(imageRequests).size} image requests before answering`);
   await page.close();
 });
 

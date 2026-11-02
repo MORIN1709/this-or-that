@@ -72,6 +72,23 @@ h2 { margin: 0; font-size: 1.3rem; }
 }
 .option:active { transform: scale(0.98); }
 .option:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.option { flex-direction: row; align-items: center; gap: 14px; }
+.option .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.thumb {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--border);
+  display: grid;
+  place-items: center;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .initial { display: none; font-size: 1.6rem; font-weight: 800; color: var(--muted); }
+.option.img-pending .thumb img { visibility: hidden; }
+.option.no-image .thumb img { display: none; }
+.option.no-image .thumb .initial { display: block; }
 .option .title, .option .meta { overflow-wrap: anywhere; }
 .option .title { font-size: 1.25rem; font-weight: 700; }
 .option .meta { color: var(--muted); font-size: 0.95rem; }

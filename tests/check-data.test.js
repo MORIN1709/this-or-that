@@ -36,14 +36,14 @@ test('reports a missing genre file', async () => {
 
 test('reports a wrongly shaped album entry', async () => {
   const dir = await copyOfSample();
-  await edit(dir, 'albums/thrash-metal.json', (a) => { a[0][1][0] = { title: 'Kill ’Em All', year: 1983 }; return a; });
+  await edit(dir, 'albums/thrash-metal.json', (a) => { a[0][1][0] = ['Kill ’Em All', 1983]; return a; });
   const r = await checkData(dir);
   assert.ok(r.errors.some((e) => e.includes('albums/thrash-metal.json') && e.includes('Metallica')), r.errors.join('\n'));
 });
 
 test('reports a song list that is not an array of strings', async () => {
   const dir = await copyOfSample();
-  await edit(dir, 'songs/nirvana.json', () => 'Blew');
+  await edit(dir, 'songs/nirvana.json', () => [['rg-1', 'Blew']]);
   const r = await checkData(dir);
   assert.ok(r.errors.some((e) => e.includes('songs/nirvana.json')), r.errors.join('\n'));
 });
@@ -57,7 +57,7 @@ test('reports counts that do not match the files', async () => {
 
 test('reports a genre with fewer than 2 items of a type', async () => {
   const dir = await copyOfSample();
-  await edit(dir, 'artists/grunge.json', () => [['Nirvana', 'nirvana']]);
+  await edit(dir, 'artists/grunge.json', () => [['Nirvana', 'nirvana', 'https://img.test/n.jpg']]);
   await edit(dir, 'index.json', (i) => { i.genres[1].counts.artists = 1; return i; });
   const r = await checkData(dir);
   assert.ok(r.errors.some((e) => e.includes('artists/grunge.json') && e.includes('at least 2')), r.errors.join('\n'));
@@ -68,4 +68,11 @@ test('reports an artist entry without a songs file key', async () => {
   await edit(dir, 'artists/grunge.json', (a) => { a[0] = ['Nirvana']; return a; });
   const r = await checkData(dir);
   assert.ok(r.errors.some((e) => e.includes('artists/grunge.json')), r.errors.join('\n'));
+});
+
+test('reports an artist without a photo', async () => {
+  const dir = await copyOfSample();
+  await edit(dir, 'artists/grunge.json', (a) => { a[1][2] = ''; return a; });
+  const r = await checkData(dir);
+  assert.ok(r.errors.some((e) => e.includes('artists/grunge.json') && e.includes('Pearl Jam') && e.includes('photo')), r.errors.join('\n'));
 });

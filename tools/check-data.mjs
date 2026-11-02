@@ -1,9 +1,9 @@
 // Checks that a data/ folder has exactly the shape the site reads (js/data-source.js):
 //
 //   index.json               { genres: [{ slug, name, counts: { artists, albums, songs } }] }
-//   artists/<slug>.json      [["Artist", "songs-key"], …]
-//   albums/<slug>.json       [["Artist", [["Album", 1986], …]], …]
-//   songs/<songs-key>.json   ["Song", …]                       (one file per artist, shared by genres)
+//   artists/<slug>.json      [["Artist", "songs-key", "https://photo"], …]
+//   albums/<slug>.json       [["Artist", [["Album", 1986, "release-group-id"], …]], …]
+//   songs/<songs-key>.json   [["release-group-id", ["Song", …]], …]   (one file per artist, shared by genres)
 //
 //   node tools/check-data.mjs [dir]        (default: data)
 import { readFile } from 'node:fs/promises';
@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 
 const isText = (v) => typeof v === 'string' && v.trim() !== '';
 const isYear = (v) => Number.isInteger(v) && v > 1900 && v < 2100;
+const isUrl = (v) => typeof v === 'string' && /^https:\/\/\S+$/.test(v);
 
 async function readJson(dir, path, errors) {
   try {
@@ -22,12 +23,16 @@ async function readJson(dir, path, errors) {
   }
 }
 
-// Returns the [name, key] entries, or null when the file has the wrong shape.
+// Returns the [name, key, photo] entries, or null when the file has the wrong shape.
+// Every artist needs a real photo URL.
 function checkArtists(path, value, errors) {
-  const ok = Array.isArray(value) && value.every((e) => Array.isArray(e) && e.length === 2 && isText(e[0]) && isText(e[1]));
+  const ok = Array.isArray(value) && value.every((e) => Array.isArray(e) && e.length === 3 && isText(e[0]) && isText(e[1]) && typeof e[2] === 'string');
   if (!ok) {
-    errors.push(`${path}: expected an array of ["Artist", "songs-key"]`);
+    errors.push(`${path}: expected an array of ["Artist", "songs-key", "https://photo"]`);
     return null;
+  }
+  for (const [name, , photo] of value) {
+    if (!isUrl(photo)) errors.push(`${path}: ${name} has no photo URL`);
   }
   return value;
 }
@@ -47,8 +52,8 @@ function checkAlbums(path, value, errors) {
       return -1;
     }
     for (const album of albums) {
-      if (!(Array.isArray(album) && album.length === 2 && isText(album[0]) && isYear(album[1]))) {
-        errors.push(`${path}: ${name} has an album that is not ["Album", year]: ${JSON.stringify(album).slice(0, 60)}`);
+      if (!(Array.isArray(album) && album.length === 3 && isText(album[0]) && isYear(album[1]) && isText(album[2]))) {
+        errors.push(`${path}: ${name} has an album that is not ["Album", year, "release-group-id"]: ${JSON.stringify(album).slice(0, 60)}`);
         return -1;
       }
       count += 1;
@@ -76,8 +81,9 @@ export async function checkData(dir = 'data') {
       const value = await readJson(dir, path, errors);
       let n = -1;
       if (value !== undefined) {
-        if (Array.isArray(value) && value.every(isText)) n = value.length;
-        else errors.push(`${path}: expected an array of song titles`);
+        const ok = Array.isArray(value) && value.every((g) => Array.isArray(g) && g.length === 2 && isText(g[0]) && Array.isArray(g[1]) && g[1].every(isText));
+        if (ok) n = value.reduce((total, [, titles]) => total + titles.length, 0);
+        else errors.push(`${path}: expected [["release-group-id", ["Song", …]], …]`);
       }
       songCounts.set(key, n);
     }
