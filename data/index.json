@@ -1,0 +1,158 @@
+{
+ "built": "2026-11-02",
+ "genres": [
+  {
+   "slug": "classic-rock",
+   "name": "classic rock",
+   "counts": {
+    "artists": 22,
+    "albums": 322,
+    "songs": 3324
+   }
+  },
+  {
+   "slug": "hard-rock",
+   "name": "hard rock",
+   "counts": {
+    "artists": 30,
+    "albums": 467,
+    "songs": 4794
+   }
+  },
+  {
+   "slug": "heavy-metal",
+   "name": "heavy metal",
+   "counts": {
+    "artists": 30,
+    "albums": 419,
+    "songs": 4473
+   }
+  },
+  {
+   "slug": "thrash-metal",
+   "name": "thrash metal",
+   "counts": {
+    "artists": 30,
+    "albums": 422,
+    "songs": 4614
+   }
+  },
+  {
+   "slug": "grunge",
+   "name": "grunge",
+   "counts": {
+    "artists": 30,
+    "albums": 277,
+    "songs": 3159
+   }
+  },
+  {
+   "slug": "punk-rock",
+   "name": "punk rock",
+   "counts": {
+    "artists": 30,
+    "albums": 365,
+    "songs": 4849
+   }
+  },
+  {
+   "slug": "progressive-rock",
+   "name": "progressive rock",
+   "counts": {
+    "artists": 30,
+    "albums": 583,
+    "songs": 5542
+   }
+  },
+  {
+   "slug": "progressive-metal",
+   "name": "progressive metal",
+   "counts": {
+    "artists": 30,
+    "albums": 454,
+    "songs": 4655
+   }
+  },
+  {
+   "slug": "doom-metal",
+   "name": "doom metal",
+   "counts": {
+    "artists": 30,
+    "albums": 332,
+    "songs": 2865
+   }
+  },
+  {
+   "slug": "death-metal",
+   "name": "death metal",
+   "counts": {
+    "artists": 30,
+    "albums": 354,
+    "songs": 3832
+   }
+  },
+  {
+   "slug": "black-metal",
+   "name": "black metal",
+   "counts": {
+    "artists": 30,
+    "albums": 350,
+    "songs": 3300
+   }
+  },
+  {
+   "slug": "alternative-rock",
+   "name": "alternative rock",
+   "counts": {
+    "artists": 30,
+    "albums": 344,
+    "songs": 4240
+   }
+  },
+  {
+   "slug": "alternative-metal",
+   "name": "alternative metal",
+   "counts": {
+    "artists": 30,
+    "albums": 252,
+    "songs": 2981
+   }
+  },
+  {
+   "slug": "nu-metal",
+   "name": "nu metal",
+   "counts": {
+    "artists": 30,
+    "albums": 268,
+    "songs": 3202
+   }
+  },
+  {
+   "slug": "glam-metal",
+   "name": "glam metal",
+   "counts": {
+    "artists": 30,
+    "albums": 291,
+    "songs": 3245
+   }
+  },
+  {
+   "slug": "power-metal",
+   "name": "power metal",
+   "counts": {
+    "artists": 30,
+    "albums": 381,
+    "songs": 4285
+   }
+  },
+  {
+   "slug": "stoner-rock",
+   "name": "stoner rock",
+   "counts": {
+    "artists": 30,
+    "albums": 241,
+    "songs": 2480
+   }
+  }
+ ]
+}
