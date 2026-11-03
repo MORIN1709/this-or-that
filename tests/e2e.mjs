@@ -91,6 +91,14 @@ const waitTitlesChange = (page, before) => page.waitForFunction((b) => {
   return document.body.dataset.state === 'end' || (document.body.dataset.state === 'question' && now !== b);
 }, before.join(' || '), { timeout: T });
 
+await check('the page declares a real icon, so the browser does not ask for /favicon.ico', async () => {
+  const page = await openPage();
+  const icon = await page.getAttribute('link[rel="icon"]', 'href');
+  assert(icon && icon.startsWith('data:image/svg+xml,') && icon.length > 40, `icon: ${icon}`);
+  assert((await page.title()).includes('זה או זה'), 'page title');
+  await page.close();
+});
+
 await check('start screen offers albums and artists only, no question yet', async () => {
   const page = await openPage();
   await page.getByRole('button', { name: 'אלבומים', exact: true }).waitFor({ state: 'visible', timeout: T });

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>זה או זה · רוק ומטאל</title>
+<meta name="description" content="מלך הגבעה ברוק ומטאל: אלבום מול אלבום, אמן מול אמן">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body data-state="start">
+<main>
+  <header>
+    <h1>זה או זה</h1>
+    <p class="sub">רוק ומטאל</p>
+  </header>
+
+  <section class="start">
+    <p class="lead">במה משחקים?</p>
+    <div class="modes">
+      <button class="mode" type="button" data-type="albums">אלבומים</button>
+      <button class="mode" type="button" data-type="artists">אמנים</button>
+    </div>
+  </section>
+
+  <section class="board" aria-live="polite">
+    <div class="ask">
+      <h2 id="question-label"></h2>
+      <span id="genre" class="genre" dir="ltr"></span>
+    </div>
+    <div class="options">
+      <button class="option" type="button"><span class="crown">👑 המלך</span><span class="thumb"><img alt="" decoding="async"><span class="initial" aria-hidden="true"></span></span><span class="text"><span class="title" dir="auto"></span><span class="meta" dir="auto"></span></span></button>
+      <span class="or" aria-hidden="true">או</span>
+      <button class="option" type="button"><span class="crown">👑 המלך</span><span class="thumb"><img alt="" decoding="async"><span class="initial" aria-hidden="true"></span></span><span class="text"><span class="title" dir="auto"></span><span class="meta" dir="auto"></span></span></button>
+    </div>
+    <button id="skip" class="secondary" type="button">עבור</button>
+  </section>
+
+  <section class="end" aria-live="polite">
+    <p class="end-title">👑 המלך של <span id="end-genre" dir="ltr"></span></p>
+    <div class="winner">
+      <span class="thumb"><img alt="" decoding="async"><span class="initial" aria-hidden="true"></span></span>
+      <span class="title" dir="auto"></span>
+      <span class="meta" dir="auto"></span>
+    </div>
+    <button id="new-game" class="primary" type="button">משחק חדש</button>
+  </section>
+
+  <p class="status" role="status">
+    <span class="loading-text">מביאים שאלה…</span>
+    <span class="error-text">לא הצלחנו להביא שאלה. בדקו את החיבור ונסו שוב.</span>
+  </p>
+  <button id="retry" class="secondary" type="button">נסה שוב</button>
+  <button id="reset" class="secondary" type="button">ערבוב מחדש</button>
+</main>
+</body>
+</html>
