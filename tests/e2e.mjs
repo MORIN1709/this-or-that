@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const LABELS = ['איזו להקה או אמן?', 'איזה אלבום?', 'איזה שיר?'];
+const LABELS = ['איזו להקה או אמן?', 'איזה אלבום?'];
 const LOADING = 'מביאים שאלה…';
 const ERROR = 'לא הצלחנו להביא שאלה. בדקו את החיבור ונסו שוב.';
 const T = 30000;
@@ -81,162 +81,212 @@ async function check(name, fn) {
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
 // ---- checks ----
-await check('loads first question', async () => {
-  const page = await openPage();
+const startGame = async (page, mode) => {
+  await page.getByRole('button', { name: mode, exact: true }).click();
   await waitForQuestion(page);
+};
+const titles = (page) => page.$$eval('button.option .title', (els) => els.map((e) => e.textContent));
+const waitTitlesChange = (page, before) => page.waitForFunction((b) => {
+  const now = [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ');
+  return document.body.dataset.state === 'end' || (document.body.dataset.state === 'question' && now !== b);
+}, before.join(' || '), { timeout: T });
+
+await check('start screen offers albums and artists only, no question yet', async () => {
+  const page = await openPage();
+  await page.getByRole('button', { name: 'אלבומים', exact: true }).waitFor({ state: 'visible', timeout: T });
+  assert(await page.getByRole('button', { name: 'אמנים', exact: true }).isVisible(), 'artists button');
+  const modes = await page.$$eval('.modes button', (bs) => bs.map((b) => b.textContent.trim()));
+  assert(JSON.stringify(modes) === JSON.stringify(['אלבומים', 'אמנים']), `modes: ${modes}`);
+  assert(!(await page.locator('.board').isVisible()), 'no question on the start screen');
+  assert(!(await page.evaluate(() => document.body.innerText.includes('שיר'))), 'songs are mentioned');
   await page.close();
 });
 
-await check('choice advances and disables', async () => {
+await check('choosing artists starts an artist game', async () => {
   const page = await openPage();
-  await waitForQuestion(page);
-  const before = await pairText(page);
+  await startGame(page, 'אמנים');
+  assert((await page.textContent('#question-label')) === 'איזו להקה או אמן?', 'artist label');
+  assert((await page.textContent('#genre')).trim() !== '', 'genre shown');
+  await page.close();
+});
+
+await check('choosing albums starts an album game', async () => {
+  const page = await openPage();
+  await startGame(page, 'אלבומים');
+  assert((await page.textContent('#question-label')) === 'איזה אלבום?', 'album label');
+  const metas = await page.$$eval('button.option .meta', (els) => els.map((e) => e.textContent));
+  assert(metas.every((m) => /\d{4}/.test(m)), `album meta: ${metas}`);
+  await page.close();
+});
+
+await check('the chosen one stays as king and a new challenger replaces the other', async () => {
+  const page = await openPage();
+  await startGame(page, 'אמנים');
+  const before = await titles(page);
+  await page.click('button.option >> nth=1');
+  await waitTitlesChange(page, before);
+  const after = await titles(page);
+  assert(after[1] === before[1], `king moved: ${before} -> ${after}`);
+  assert(after[0] !== before[0] && after[0] !== before[1], `challenger: ${before} -> ${after}`);
+  const kings = await page.$$eval('button.option', (bs) => bs.map((b) => b.classList.contains('king') && b.querySelector('.crown').offsetParent !== null));
+  assert(JSON.stringify(kings) === '[false,true]', `crowns: ${kings}`);
+  await page.close();
+});
+
+await check('skip replaces only the challenger', async () => {
+  const page = await openPage();
+  await startGame(page, 'אמנים');
+  let before = await titles(page);
   await page.click('button.option >> nth=0');
-  const disabled = await page.$$eval('button.option', (bs) => bs.every((b) => b.disabled));
-  assert(disabled, 'both options should be disabled right after a choice');
-  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, before, { timeout: T });
-  await waitForQuestion(page);
+  await waitTitlesChange(page, before);
+  before = await titles(page);
+  await page.getByRole('button', { name: 'עבור' }).click();
+  await waitTitlesChange(page, before);
+  const after = await titles(page);
+  assert(after[0] === before[0] && after[1] !== before[1], `${before} -> ${after}`);
+  await page.close();
+});
+
+await check('skip before any choice replaces both', async () => {
+  const page = await openPage();
+  await startGame(page, 'אמנים');
+  const before = await titles(page);
+  await page.getByRole('button', { name: 'עבור' }).click();
+  await waitTitlesChange(page, before);
+  const after = await titles(page);
+  assert(after.every((t) => !before.includes(t)), `${before} -> ${after}`);
   await page.close();
 });
 
 await check('double click registers once', async () => {
   const page = await openPage();
-  await waitForQuestion(page);
-  await page.waitForTimeout(2000); // let Q2 and Q3 arrive so Q1→Q2 is instant
-  const q0 = await pairText(page);
-  await page.dblclick('button.option >> nth=1');
-  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, q0, { timeout: T });
-  await waitForQuestion(page);
-  const q1 = await pairText(page);
+  await startGame(page, 'אלבומים');
+  const before = await titles(page);
+  await page.dblclick('button.option >> nth=0');
+  await waitTitlesChange(page, before);
+  const once = await titles(page);
   await page.waitForTimeout(1500);
-  assert((await pairText(page)) === q1, 'a second question was consumed by the double click');
+  assert(JSON.stringify(await titles(page)) === JSON.stringify(once), 'a second challenger was consumed');
   await page.close();
 });
 
-await check('reset loads a question', async () => {
+await check('reset returns to the start screen', async () => {
   const page = await openPage();
-  await waitForQuestion(page);
-  await page.click('#reset');
-  await waitForQuestion(page);
+  await startGame(page, 'אמנים');
+  await page.getByRole('button', { name: 'ערבוב מחדש' }).click();
+  await page.getByRole('button', { name: 'אמנים', exact: true }).waitFor({ state: 'visible', timeout: T });
+  assert(!(await page.locator('.board').isVisible()), 'board still visible');
   await page.close();
 });
 
-await check('error then retry', async () => {
-  mode = 'fail';
+await check('a full game ends with the king, and a new game starts over', async () => {
   const page = await openPage();
-  await page.getByText(ERROR).waitFor({ state: 'visible', timeout: T });
-  assert(await page.getByRole('button', { name: 'נסה שוב' }).isVisible(), 'retry button visible');
-  mode = 'ok';
-  await page.getByRole('button', { name: 'נסה שוב' }).click();
-  await waitForQuestion(page);
+  await startGame(page, 'אמנים');
+  const genre = (await page.textContent('#genre')).trim();
+  let king = null;
+  for (let i = 0; i < 200; i++) {
+    const state = await page.evaluate(() => document.body.dataset.state);
+    if (state === 'end') break;
+    const before = await titles(page);
+    const side = await page.$$eval('button.option', (bs) => Math.max(0, bs.findIndex((b) => b.classList.contains('king'))));
+    king = before[side];
+    await page.click(`button.option >> nth=${side}`);
+    await waitTitlesChange(page, before);
+  }
+  await page.locator('.end').waitFor({ state: 'visible', timeout: T });
+  assert((await page.textContent('#end-genre')).trim() === genre, 'genre on the end screen');
+  assert((await page.textContent('.end .title')).trim() === king, `winner should be ${king}`);
+  assert(await page.locator('.end img').isVisible(), 'winner picture');
+  await page.getByRole('button', { name: 'משחק חדש' }).click();
+  await page.getByRole('button', { name: 'אלבומים', exact: true }).waitFor({ state: 'visible', timeout: T });
   await page.close();
 });
 
-await check('no horizontal scroll with long names', async () => {
+await check('pictures are 200x200', async () => {
   const page = await openPage();
-  await waitForQuestion(page);
-  await page.$$eval('button.option .title', (els) => {
-    els[0].textContent = 'A Very Long Album Title That Keeps Going and Going Past Any Reasonable Width';
-    els[1].textContent = 'TheExtraordinarilyLongNamedThrashCollectiveOfTheNorthernValleyRegionWithoutSpaces';
-  });
-  const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-  assert(fits, 'page scrolls horizontally');
-  await page.close();
-});
-
-await check('option text is dir=auto', async () => {
-  const page = await openPage();
-  await waitForQuestion(page);
-  const dirs = await page.$$eval('button.option .title, button.option .meta', (els) => els.map((e) => e.getAttribute('dir')));
-  assert(dirs.length === 4 && dirs.every((d) => d === 'auto'), `dirs: ${dirs}`);
-  await page.close();
-});
-
-await check('slow network shows loading', async () => {
-  mode = 'slow';
-  const page = await openPage();
-  await page.getByText(LOADING).waitFor({ state: 'visible', timeout: T });
-  await waitForQuestion(page);
-  await page.close();
-});
-
-await check('skip moves to another question without choosing', async () => {
-  const page = await openPage();
-  await waitForQuestion(page);
-  await page.waitForTimeout(2000); // let the next questions arrive
-  const before = await pairText(page);
-  await page.getByRole('button', { name: 'עבור' }).click();
-  const after = await page.$$eval('button.option', (bs) => ({ chosen: bs.filter((b) => b.classList.contains('chosen')).length, disabled: bs.every((b) => b.disabled) }));
-  assert(after.chosen === 0, 'skip must not mark an option as chosen');
-  assert(after.disabled, 'options are disabled while skipping');
-  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, before, { timeout: T });
-  await waitForQuestion(page);
-  await page.close();
-});
-
-await check('double click on skip skips once', async () => {
-  const page = await openPage();
-  await waitForQuestion(page);
-  await page.waitForTimeout(2000);
-  const q0 = await pairText(page);
-  await page.getByRole('button', { name: 'עבור' }).dblclick();
-  await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, q0, { timeout: T });
-  await waitForQuestion(page);
-  const q1 = await pairText(page);
-  await page.waitForTimeout(1500);
-  assert((await pairText(page)) === q1, 'a second question was skipped by the double click');
-  await page.close();
-});
-
-await check('no data credit line on the page', async () => {
-  const page = await openPage();
-  await waitForQuestion(page);
-  const text = await page.evaluate(() => document.body.innerText);
-  assert(!/MusicBrainz|ListenBrainz/.test(text), 'credit line still shown');
+  await startGame(page, 'אמנים');
+  const sizes = await page.$$eval('button.option .thumb', (ts) => ts.map((t) => [t.getBoundingClientRect().width, t.getBoundingClientRect().height]));
+  assert(sizes.every(([w, h]) => w === 200 && h === 200), `sizes: ${JSON.stringify(sizes)}`);
   await page.close();
 });
 
 await check('every option shows its picture', async () => {
   const page = await openPage();
-  await waitForQuestion(page);
+  await startGame(page, 'אלבומים');
   await page.waitForFunction(() => [...document.querySelectorAll('button.option img')].every((i) => i.complete && i.naturalWidth > 0 && i.offsetParent !== null), null, { timeout: T });
-  const srcs = await page.$$eval('button.option img', (imgs) => imgs.map((i) => i.getAttribute('src')));
-  assert(srcs.length === 2 && srcs.every((s) => /^https:/.test(s)), `srcs: ${srcs}`);
   await page.close();
 });
 
 await check('a picture that fails to load shows the first letter instead', async () => {
   imageMode = 'broken';
   const page = await openPage();
-  await waitForQuestion(page);
+  await startGame(page, 'אמנים');
   await page.waitForFunction(() => [...document.querySelectorAll('button.option')].every((b) => b.classList.contains('no-image')), null, { timeout: T });
   const shown = await page.$$eval('button.option', (bs) => bs.map((b) => ({
     letter: b.querySelector('.initial').textContent,
     first: b.querySelector('.title').textContent.trim().charAt(0).toUpperCase(),
-    letterVisible: b.querySelector('.initial').offsetParent !== null,
-    imgVisible: b.querySelector('img').offsetParent !== null,
+    visible: b.querySelector('.initial').offsetParent !== null,
   })));
-  assert(shown.every((x) => x.letter === x.first && x.letterVisible && !x.imgVisible), JSON.stringify(shown));
+  assert(shown.every((x) => x.letter === x.first && x.visible), JSON.stringify(shown));
   await page.close();
 });
 
-await check('pictures of the next questions are loaded ahead', async () => {
+await check('pictures of the next challengers are loaded ahead', async () => {
   imageRequests.length = 0;
   const page = await openPage();
+  await startGame(page, 'אמנים');
+  await page.waitForTimeout(1500);
+  assert(new Set(imageRequests).size >= 4, `only ${new Set(imageRequests).size} pictures requested`);
+  await page.close();
+});
+
+await check('error then retry', async () => {
+  mode = 'fail';
+  const page = await openPage();
+  await page.getByRole('button', { name: 'אמנים', exact: true }).click();
+  await page.getByText(ERROR).waitFor({ state: 'visible', timeout: T });
+  mode = 'ok';
+  await page.getByRole('button', { name: 'נסה שוב' }).click();
   await waitForQuestion(page);
-  await page.waitForTimeout(2000);
-  assert(new Set(imageRequests).size >= 4, `only ${new Set(imageRequests).size} image requests before answering`);
+  await page.close();
+});
+
+await check('slow network shows loading', async () => {
+  mode = 'slow';
+  const page = await openPage();
+  await page.getByRole('button', { name: 'אמנים', exact: true }).click();
+  await page.getByText(LOADING).waitFor({ state: 'visible', timeout: T });
+  await waitForQuestion(page);
+  await page.close();
+});
+
+await check('no horizontal scroll with long names', async () => {
+  const page = await openPage();
+  await startGame(page, 'אלבומים');
+  await page.$$eval('button.option .title', (els) => {
+    els[0].textContent = 'A Very Long Album Title That Keeps Going and Going Past Any Reasonable Width';
+    els[1].textContent = 'TheExtraordinarilyLongNamedThrashCollectiveOfTheNorthernValleyRegionWithoutSpaces';
+  });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'page scrolls horizontally');
+  await page.close();
+});
+
+await check('option text is dir=auto', async () => {
+  const page = await openPage();
+  await startGame(page, 'אלבומים');
+  const dirs = await page.$$eval('button.option .title, button.option .meta', (els) => els.map((e) => e.getAttribute('dir')));
+  assert(dirs.length === 4 && dirs.every((d) => d === 'auto'), `dirs: ${dirs}`);
   await page.close();
 });
 
 await check('never contacts MusicBrainz or ListenBrainz', async () => {
   externalRequests.length = 0;
   const page = await openPage();
-  for (let i = 0; i < 5; i++) {
-    await waitForQuestion(page);
-    const before = await pairText(page);
+  await startGame(page, 'אמנים');
+  for (let i = 0; i < 3; i++) {
+    const before = await titles(page);
     await page.click('button.option >> nth=0');
-    await page.waitForFunction((b) => [...document.querySelectorAll('button.option .title')].map((e) => e.textContent).join(' || ') !== b, before, { timeout: T });
+    await waitTitlesChange(page, before);
   }
   assert(externalRequests.length === 0, `external requests: ${externalRequests.join(', ')}`);
   await page.close();

@@ -1,7 +1,7 @@
 // Reads the static music data in data/ (a one-time snapshot from MusicBrainz and ListenBrainz):
-//   index.json, artists/<genre>.json ([name, songsKey, photoUrl]), albums/<genre>.json ([title, year, coverRef]),
-//   songs/<songsKey>.json ([[coverRef, [titles]], …])
-// Each file is fetched once, when a question first needs it; a failed fetch is retried next time.
+//   index.json, artists/<genre>.json ([name, songsKey, photoUrl]), albums/<genre>.json ([title, year, coverRef])
+// (data/songs/ is kept but not used by the game for now.)
+// Each file is fetched once, when a game first needs it; a failed fetch is retried next time.
 const itemId = (type, artist, title) => `${type}|${artist.toLowerCase()}|${title.toLowerCase()}`;
 
 // Album cover: a MusicBrainz release id (checked at build time to have a front cover in the Cover Art
@@ -46,11 +46,5 @@ export function createDataSource({ fetchImpl = (...a) => fetch(...a), base = 'da
 
     albums: async (genre) => (await file('albums', genre)).flatMap(([artist, albums]) =>
       albums.map(([title, year, cover]) => ({ id: itemId('album', artist, title), title, artist, year, image: coverUrl(cover) }))),
-
-    // Song questions draw two artists, then load only those two artists' song files.
-    artists: async (genre) => (await file('artists', genre)).map(([name, key]) => ({ name, key })),
-
-    songsOf: async ({ name, key }) => (await load(`songs/${key}.json`)).flatMap(([cover, titles]) =>
-      titles.map((title) => ({ id: itemId('song', name, title), title, artist: name, image: coverUrl(cover) }))),
   };
 }

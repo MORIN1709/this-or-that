@@ -54,20 +54,10 @@ test('coverUrl: a release id points at its 250px Cover Art Archive front cover; 
   assert.equal(coverUrl('https://cdn-images.dzcdn.net/images/cover/x/250x250.jpg'), 'https://cdn-images.dzcdn.net/images/cover/x/250x250.jpg');
 });
 
-test('lists artists with their songs key, and loads only the drawn artist songs file', async () => {
-  const fetchImpl = fakeFetch();
-  const data = createDataSource({ fetchImpl });
-  const artists = await data.artists('thrash metal');
-  assert.deepEqual(artists.map(({ name, key }) => ({ name, key })), [{ name: 'Metallica', key: 'metallica' }, { name: 'Slayer', key: 'slayer' }]);
-  const songs = await data.songsOf(artists[0]);
-  assert.deepEqual(songs.map(({ title, artist, image }) => ({ title, artist, image })), [
-    { title: 'Hit the Lights', artist: 'Metallica', image: coverUrl('rg-kea') },
-    { title: 'Battery', artist: 'Metallica', image: coverUrl('rg-mop') },
-    { title: 'Orion', artist: 'Metallica', image: coverUrl('rg-mop') },
-  ]);
-  assert.equal(new Set(songs.map((x) => x.id)).size, 3);
-  assert.ok(fetchImpl.calls.includes('data/songs/metallica.json'));
-  assert.ok(!fetchImpl.calls.some((u) => u.includes('slayer')), 'only the drawn artist is downloaded');
+test('has no song data access (songs are not part of the game)', () => {
+  const data = createDataSource({ fetchImpl: fakeFetch() });
+  assert.equal(data.songsOf, undefined);
+  assert.equal(data.artists, undefined);
 });
 
 test('ids differ for non-Latin names (no collapse to empty)', async () => {
@@ -78,27 +68,25 @@ test('ids differ for non-Latin names (no collapse to empty)', async () => {
 });
 
 test('a failed file is retried on the next call', async () => {
-  const files = { ...FILES, 'data/songs/metallica.json': new Error('offline') };
+  const files = { ...FILES, 'data/albums/thrash-metal.json': new Error('offline') };
   const fetchImpl = fakeFetch(files);
   const data = createDataSource({ fetchImpl });
-  const metallica = { name: 'Metallica', key: 'metallica' };
-  await assert.rejects(data.songsOf(metallica), /offline/);
-  files['data/songs/metallica.json'] = FILES['data/songs/metallica.json'];
-  assert.equal((await data.songsOf(metallica)).length, 3);
+  await assert.rejects(data.albums('thrash metal'), /offline/);
+  files['data/albums/thrash-metal.json'] = FILES['data/albums/thrash-metal.json'];
+  assert.equal((await data.albums('thrash metal')).length, 2);
 });
 
 test('a stalled file times out, and the next call tries again', { timeout: 3000 }, async () => {
-  let songDownloads = 0;
+  let albumDownloads = 0;
   const fetchImpl = (url, init = {}) => {
     if (url.endsWith('index.json')) return Promise.resolve({ ok: true, status: 200, json: async () => INDEX });
-    songDownloads += 1;
-    if (songDownloads === 1) return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timed out'))));
-    return Promise.resolve({ ok: true, status: 200, json: async () => FILES['data/songs/metallica.json'] });
+    albumDownloads += 1;
+    if (albumDownloads === 1) return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timed out'))));
+    return Promise.resolve({ ok: true, status: 200, json: async () => FILES['data/albums/thrash-metal.json'] });
   };
   const data = createDataSource({ fetchImpl, timeoutMs: 50 });
-  const metallica = { name: 'Metallica', key: 'metallica' };
-  await assert.rejects(data.songsOf(metallica));
-  assert.equal((await data.songsOf(metallica)).length, 3);
+  await assert.rejects(data.albums('thrash metal'));
+  assert.equal((await data.albums('thrash metal')).length, 2);
 });
 
 test('a missing file rejects with the status', async () => {
