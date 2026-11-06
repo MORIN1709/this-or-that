@@ -114,7 +114,7 @@ await check('choosing artists starts an artist game', async () => {
   const page = await openPage();
   await startGame(page, 'אמנים');
   assert((await page.textContent('#question-label')) === 'איזו להקה או אמן?', 'artist label');
-  assert((await page.textContent('#genre')).trim() !== '', 'genre shown');
+  assert((await page.locator('#genre').count()) === 0, 'no genre is shown');
   await page.close();
 });
 
@@ -187,12 +187,12 @@ await check('reset returns to the start screen', async () => {
   await page.close();
 });
 
-await check('a full game ends with the king, and a new game starts over', async () => {
+await check('a full game draws challengers from every genre and ends with the king', async () => {
   const page = await openPage();
   await startGame(page, 'אמנים');
-  const genre = (await page.textContent('#genre')).trim();
+  const seen = new Set(await titles(page));
   let king = null;
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 600; i++) {
     const state = await page.evaluate(() => document.body.dataset.state);
     if (state === 'end') break;
     const before = await titles(page);
@@ -200,11 +200,16 @@ await check('a full game ends with the king, and a new game starts over', async 
     king = before[side];
     await page.click(`button.option >> nth=${side}`);
     await waitTitlesChange(page, before);
+    if ((await page.evaluate(() => document.body.dataset.state)) === 'question') (await titles(page)).forEach((t) => seen.add(t));
   }
   await page.locator('.end').waitFor({ state: 'visible', timeout: T });
-  assert((await page.textContent('#end-genre')).trim() === genre, 'genre on the end screen');
+  assert((await page.textContent('.end-title')).trim() === '👑 המלך', `end title: ${await page.textContent('.end-title')}`);
   assert((await page.textContent('.end .title')).trim() === king, `winner should be ${king}`);
-  assert(await page.locator('.end img').isVisible(), 'winner picture');
+  if (!process.env.E2E_DATA) {
+    // the sample has thrash metal and grunge, 6 artists each
+    assert(seen.has('Metallica') && seen.has('Nirvana'), `seen: ${[...seen]}`);
+    assert(seen.size === 12, `met ${seen.size} artists, expected all 12`);
+  }
   await page.getByRole('button', { name: 'משחק חדש' }).click();
   await page.getByRole('button', { name: 'אלבומים', exact: true }).waitFor({ state: 'visible', timeout: T });
   await page.close();

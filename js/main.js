@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 const options = [...document.querySelectorAll('button.option')];
 const skip = $('skip');
 
-let game = null;     // { type, genre, hill }
+let game = null;     // { type, hill }
 let lastType = null; // for "try again"
 let ticket = 0;      // bumps when a game starts or is abandoned; stale timers and loads check it
 
@@ -20,8 +20,6 @@ function setState(state) {
     skip.disabled = true;
   }
 }
-
-const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
 
 // A picture; until it loads the previous one stays hidden, and if it can't load the first letter of
 // the name is shown instead.
@@ -56,19 +54,24 @@ function preload(item) {
 
 const metaLine = (item) => (game.type === 'albums' ? [item.artist, item.year].filter(Boolean).join(' · ') : '');
 
-// A new game: one random sub-genre whose list loads and has at least two items.
+const shuffled = (list) => list.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+
+// A new game. Challengers come from every genre: the game starts as soon as one genre's list has
+// loaded, and the other genres are mixed in in the background (an artist listed in several genres
+// shows up once).
 async function startGame(type) {
   lastType = type;
   const mine = ++ticket;
+  const load = (genre) => (type === 'artists' ? data.bands(genre) : data.albums(genre));
   setState('loading');
   try {
-    const genres = await data.genres();
+    const genres = shuffled(await data.genres());
     let items = [];
-    let genre = null;
-    for (let attempt = 0; attempt < 5 && items.length < 2; attempt++) {
-      genre = pickRandom(genres);
+    let next = 0;
+    while (items.length < 2 && next < genres.length && next < 5) {
+      const genre = genres[next++];
       try {
-        items = type === 'artists' ? await data.bands(genre) : await data.albums(genre);
+        items = await load(genre);
       } catch (err) {
         console.warn(`Could not load ${type} of "${genre}":`, err.message);
         items = [];
@@ -76,8 +79,17 @@ async function startGame(type) {
     }
     if (items.length < 2) throw new Error(`no genre with enough ${type}`);
     if (mine !== ticket) return;
-    game = { type, genre, hill: createHill(items) };
+    game = { type, hill: createHill(items) };
     render();
+    for (const genre of genres.slice(next)) {
+      try {
+        const more = await load(genre);
+        if (mine !== ticket) return;
+        game.hill.add(more);
+      } catch (err) {
+        console.warn(`Could not load ${type} of "${genre}":`, err.message);
+      }
+    }
   } catch (err) {
     if (mine !== ticket) return;
     console.warn('Could not start a game:', err);
@@ -86,9 +98,8 @@ async function startGame(type) {
 }
 
 function render() {
-  const { hill, type, genre } = game;
+  const { hill, type } = game;
   $('question-label').textContent = LABELS[type];
-  $('genre').textContent = genre;
   hill.pair.forEach((item, side) => {
     const button = options[side];
     button.querySelector('.title').textContent = item.title;
@@ -104,9 +115,8 @@ function render() {
 }
 
 function showEnd() {
-  const { hill, genre } = game;
+  const { hill } = game;
   const box = document.querySelector('.winner');
-  $('end-genre').textContent = genre;
   box.querySelector('.title').textContent = hill.winner.title;
   box.querySelector('.meta').textContent = metaLine(hill.winner);
   showPicture(box, hill.winner);

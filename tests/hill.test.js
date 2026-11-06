@@ -88,3 +88,37 @@ test('upcoming(n) lists the next challengers, for preloading their pictures', ()
 test('needs at least two items', () => {
   assert.throws(() => createHill(items(1)), /at least 2/);
 });
+
+test('add mixes new items into the remaining challengers', () => {
+  const hill = createHill(items(3), { random: noShuffle });
+  hill.add([{ id: 'x1', title: 'X1' }, { id: 'x2', title: 'X2' }]);
+  const seen = new Set(ids(hill.pair));
+  while (!hill.done) {
+    hill.choose(hill.kingSide ?? 0);
+    if (!hill.done) seen.add(hill.pair[1 - hill.kingSide].id);
+  }
+  assert.ok(seen.has('x1') && seen.has('x2'), [...seen].join(','));
+  assert.equal(seen.size, 5);
+});
+
+test('add skips items already in this game (same artist listed in several genres)', () => {
+  const hill = createHill(items(3), { random: noShuffle });
+  const before = ids(hill.pair);
+  hill.add([{ id: before[0], title: 'dup on screen' }, { id: 'i2', title: 'dup in queue' }, { id: 'new', title: 'New' }]);
+  assert.deepEqual(hill.upcoming(10).map((x) => x.id).sort(), ['i2', 'new']);
+});
+
+test('createHill drops duplicate ids from the starting list', () => {
+  const hill = createHill([{ id: 'a', title: 'A' }, { id: 'a', title: 'A again' }, { id: 'b', title: 'B' }], { random: noShuffle });
+  assert.deepEqual(ids(hill.pair), ['a', 'b']);
+  assert.equal(hill.upcoming(5).length, 0);
+});
+
+test('add after the game is over changes nothing', () => {
+  const hill = createHill(items(2), { random: noShuffle });
+  hill.choose(0);
+  assert.equal(hill.done, true);
+  hill.add([{ id: 'late', title: 'Late' }]);
+  assert.equal(hill.done, true);
+  assert.equal(hill.upcoming(5).length, 0);
+});
